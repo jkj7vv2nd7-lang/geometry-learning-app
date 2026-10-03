@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>インタラクティブ図形学習支援ツール</title>
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            student: { 50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+            teacher: { 50:'#f0fdf4', 100:'#dcfce7', 500:'#22c55e', 600:'#16a34a', 700:'#15803d' }
+          }
+        }
+      }
+    };
+  </script>
+  <!-- 独自スタイル -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-mode="student" class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- ==================== ヘッダー ==================== -->
+  <header id="app-header" class="mode-header w-full px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md sticky top-0 z-30">
+    <div class="flex items-center gap-3">
+      <div id="app-logo" class="w-10 h-10 rounded-xl grid place-items-center text-2xl bg-white/80" aria-hidden="true">📐</div>
+      <div>
+        <h1 id="app-title" class="text-lg sm:text-xl font-bold leading-tight">インタラクティブ図形学習支援ツール</h1>
+        <p id="app-subtitle" class="text-xs opacity-80">探求しよう・つくろう・説明しよう — 図形の学びを可視化</p>
+      </div>
+    </div>
+
+    <!-- モード切替：児童・生徒 / 教師 -->
+    <nav id="mode-switcher" aria-label="モード切替" class="flex items-center gap-2 bg-white/70 p-1 rounded-full">
+      <button
+        id="mode-student-btn"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        data-mode-target="student"
+        class="mode-tab-btn mode-tab-active px-5 py-2 rounded-full font-bold text-sm min-h-[44px] transition">
+        🎒 児童・生徒モード
+      </button>
+      <button
+        id="mode-teacher-btn"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        data-mode-target="teacher"
+        class="mode-tab-btn px-5 py-2 rounded-full font-bold text-sm min-h-[44px] transition">
+        🍎 教師モード
+      </button>
+    </nav>
+  </header>
+
+  <!-- ==================== 2カラム全体 ==================== -->
+  <div id="app-layout" class="flex-1 w-full max-w-[1600px] mx-auto p-3 sm:p-4 grid gap-4 lg:grid-cols-[370px_minmax(0,1fr)] grid-cols-1 items-start">
+
+    <!-- ==================== 左：コントロール＆入力パネル ==================== -->
+    <aside id="control-panel" aria-label="コントロールパネル" class="bg-white rounded-2xl shadow p-4 sm:p-5 flex flex-col gap-5 lg:sticky lg:top-[84px]">
+      <!-- 学年選択 -->
+      <section id="grade-section" aria-labelledby="grade-label">
+        <label id="grade-label" for="grade-select" class="block font-bold mb-2 text-sm">📚 学年選択</label>
+        <select id="grade-select" name="grade" class="w-full border rounded-xl px-3 py-3 text-base min-h-[44px] focus:ring-2 focus:outline-none">
+          <option value="elementary-low">小学校 低学年（1〜3年）</option>
+          <option value="elementary-high" selected>小学校 高学年（4〜6年）</option>
+          <option value="junior">中学校（1〜3年）</option>
+          <option value="high">高等学校</option>
+        </select>
+        <p class="text-xs text-slate-500 mt-1">学年に応じて解説の言葉づかいと図形の難易度を調整します。</p>
+      </section>
+
+      <!-- 単元・図形指示入力 -->
+      <section id="prompt-section" aria-labelledby="prompt-label">
+        <label id="prompt-label" for="geometry-prompt-input" class="block font-bold mb-2 text-sm">✏️ 単元・図形指示入力</label>
+        <textarea
+          id="geometry-prompt-input"
+          rows="5"
+          placeholder="例：&#10;・直角三角形と内接円を描いて&#10;・三平方の定理の証明図を作って&#10;・円に内接する正六角形を描いて角度を測りたい"
+          class="w-full border rounded-xl px-3 py-3 text-base focus:ring-2 focus:outline-none resize-y min-h-[120px]"></textarea>
+        <div class="flex flex-wrap gap-2 mt-2">
+          <button type="button" class="prompt-example-chip" data-example="直角三角形と内接円を描いて">直角三角形＋内接円</button>
+          <button type="button" class="prompt-example-chip" data-example="三平方の定理の証明図を作って">三平方の定理</button>
+          <button type="button" class="prompt-example-chip" data-example="円に内接する正六角形を描いて">正六角形</button>
+        </div>
+      </section>
+
+      <!-- ソース材料インプット（教師モード時に活性化） -->
+      <section id="teacher-source-area" aria-labelledby="source-label" class="border rounded-2xl p-3 transition teacher-locked">
+        <div class="flex items-center justify-between mb-2">
+          <h2 id="source-label" class="font-bold text-sm">📂 ソース材料インプット</h2>
+          <span id="teacher-only-badge" class="text-[11px] font-bold px-2 py-1 rounded-full">教師モード限定</span>
+        </div>
+
+        <!-- ドラッグ＆ドロップ用アップロードゾーン -->
+        <div
+          id="upload-zone"
+          role="button"
+          tabindex="0"
+          aria-label="教科書PDFやノート写真のアップロードゾーン"
+          aria-disabled="true"
+          class="upload-zone border-2 border-dashed rounded-xl p-6 text-center cursor-pointer select-none">
+          <p id="upload-zone-text" class="font-bold">📤 ここにドラッグ＆ドロップ<br /><span class="font-normal text-sm">または クリックしてファイルを選択</span></p>
+          <p class="text-xs mt-1 opacity-70">対応: PDF / JPG / PNG（最大10MB）</p>
+          <input id="file-input" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple class="hidden" />
+        </div>
+        <ul id="source-file-list" class="mt-2 space-y-1 text-sm" aria-live="polite"></ul>
+
+        <!-- URL入力フォーム -->
+        <div class="mt-3">
+          <label for="source-url-input" class="block text-sm font-bold mb-1">🔗 信頼できるWebサイトのURL</label>
+          <div class="flex gap-2">
+            <input
+              id="source-url-input"
+              type="url"
+              placeholder="https://…（文部科学省・教科書会社など）"
+              class="flex-1 border rounded-xl px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:outline-none" />
+            <button id="add-url-btn" type="button" class="px-4 rounded-xl font-bold text-sm min-h-[44px] min-w-[44px]">追加</button>
+          </div>
+          <ul id="source-url-list" class="mt-2 space-y-1 text-sm" aria-live="polite"></ul>
+        </div>
+      </section>
+
+      <!-- 実行・保存系ボタン -->
+      <section id="action-section" class="flex flex-col gap-2">
+        <button id="generate-btn" type="button" class="w-full text-white font-extrabold text-lg rounded-2xl py-4 min-h-[56px] shadow-lg active:scale-[.98] transition">
+          ✨ 図形を生成・探求する
+        </button>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="save-json-btn" type="button" title="現在の図形データをJSONで保存" class="sub-action-btn">💾 JSON保存</button>
+          <button id="load-json-btn" type="button" title="保存したJSONを読み込み" class="sub-action-btn">📂 JSON読込</button>
+          <input id="load-json-input" type="file" accept="application/json,.json" class="hidden" />
+        </div>
+        <p id="action-hint" class="text-xs text-slate-500">FastAPIバックエンドに接続し、正確な座標データを取得して描画します。</p>
+      </section>
+    </aside>
+
+    <!-- ==================== 右：メイン表示エリア ==================== -->
+    <main id="main-display-area" class="flex flex-col gap-4 min-w-0">
+
+      <!-- ===== 児童・生徒モード表示 ===== -->
+      <div id="student-view" role="tabpanel" aria-labelledby="mode-student-btn" class="flex flex-col gap-4">
+        <!-- 図形キャンバス -->
+        <section id="canvas-section" aria-labelledby="canvas-heading" class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
+            <h2 id="canvas-heading" class="font-extrabold">📊 図形キャンバス</h2>
+            <div id="canvas-toolbar" class="flex flex-wrap items-center gap-2 text-sm">
+              <span id="backend-status" class="status-dot" title="バックエンド接続状態">● 待機中</span>
+              <button id="reset-view-btn" type="button" class="tool-btn">⟲ 表示リセット</button>
+              <button id="toggle-measure-btn" type="button" class="tool-btn" aria-pressed="true">📏 計測表示 ON</button>
+            </div>
+          </div>
+
+          <div id="canvas-container" class="relative w-full bg-grid">
+            <!-- 将来：GeoGebra風ドラッグ操作はこのSVG上の点・線要素 (.draggable-point / .draggable-line) にバインド -->
+            <svg id="geometry-canvas" viewBox="0 0 800 500" class="w-full h-auto block touch-none select-none" role="img" aria-label="生成された図形">
+              <defs>
+                <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+                </pattern>
+              </defs>
+              <rect x="0" y="0" width="800" height="500" fill="url(#grid-pattern)" />
+              <g id="geometry-layer"><!-- JS(app.js)が座標JSONから図形を描画 --></g>
+              <g id="measure-layer"><!-- 辺の長さ・角度ラベルを描画 --></g>
+              <text id="canvas-placeholder" x="400" y="250" text-anchor="middle" fill="#94a3b8" font-size="20">
+                左の入力欄から「図形を生成・探求する」を押してね！
+              </text>
+            </svg>
+            <!-- リアルタイム計測値 -->
+            <div id="measurement-display" aria-live="polite" class="absolute left-3 bottom-3 bg-black/75 text-white text-xs sm:text-sm rounded-xl px-3 py-2">
+              📏 辺AB: — ｜ 辺BC: — ｜ ∠B: — ｜ 面積: —
+            </div>
+          </div>
+          <p class="text-xs text-slate-500 px-4 py-2">💡 ヒント：点（●）をドラッグすると図形が動くよ！頂点を動かして角度や長さの変化を観察しよう。</p>
+        </section>
+
+        <!-- チャット・解説エリア -->
+        <section id="chat-section" aria-labelledby="chat-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
+          <h2 id="chat-heading" class="font-extrabold px-4 py-3 border-b">💬 AI先生の解説・問いかけ</h2>
+          <div id="chat-messages" class="p-4 space-y-3 max-h-[320px] overflow-y-auto" aria-live="polite">
+            <div class="chat-bubble-ai">
+              <p>こんにちは！図形の探求を始めよう。左の入力欄に描きたい図形を書いて「図形を生成・探求する」を押してね。たとえば <b>「直角三角形と内接円を描いて」</b> と入力してみよう。</p>
+            </div>
+          </div>
+          <div id="chat-input-row" class="flex gap-2 p-3 border-t">
+            <input id="chat-input" type="text" placeholder="わからないこと・試したいことを聞いてみよう（例：なぜ内接円の中心はそこにあるの？）" class="flex-1 border rounded-xl px-3 py-3 text-sm min-h-[44px] focus:ring-2 focus:outline-none" />
+            <button id="chat-send-btn" type="button" class="px-5 rounded-xl font-bold min-h-[44px]">送信</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===== 教師モード表示 ===== -->
+      <div id="teacher-view" role="tabpanel" aria-labelledby="mode-teacher-btn" class="hidden flex-col gap-4">
+        <!-- タブバー -->
+        <div id="teacher-tabs" role="tablist" aria-label="教師用出力タブ" class="bg-white rounded-2xl shadow p-2 flex flex-col sm:flex-row gap-2">
+          <button id="tab-lesson-plan" role="tab" aria-selected="true" aria-controls="panel-lesson-plan" data-teacher-tab="lesson-plan" class="teacher-tab teacher-tab-active">📝 指導案出力</button>
+          <button id="tab-print-figure" role="tab" aria-selected="false" aria-controls="panel-print-figure" data-teacher-tab="print-figure" class="teacher-tab">🖨️ 印刷・板書用図形</button>
+          <button id="tab-worksheet" role="tab" aria-selected="false" aria-controls="panel-worksheet" data-teacher-tab="worksheet" class="teacher-tab">📋 ワークシート・問題集</button>
+        </div>
+
+        <!-- 指導案出力タブ -->
+        <section id="panel-lesson-plan" role="tabpanel" aria-labelledby="tab-lesson-plan" data-teacher-panel="lesson-plan" class="teacher-panel bg-white rounded-2xl shadow p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 class="font-extrabold">📝 学習指導案（3観点対応）</h2>
+            <div class="flex gap-2">
+              <button id="copy-lesson-plan-btn" type="button" class="tool-btn">📑 Markdownコピー</button>
+              <button id="download-lesson-plan-btn" type="button" class="tool-btn">⬇️ ダウンロード</button>
+            </div>
+          </div>
+          <article id="lesson-plan-output" class="prose max-w-none text-sm leading-relaxed">
+            <p class="text-slate-400">ここに生成された指導案が表示されます。「図形を生成・探求する」を実行してください。</p>
+          </article>
+        </section>
+
+        <!-- 印刷・板書用高解像度図形タブ -->
+        <section id="panel-print-figure" role="tabpanel" aria-labelledby="tab-print-figure" data-teacher-panel="print-figure" class="teacher-panel hidden bg-white rounded-2xl shadow p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 class="font-extrabold">🖨️ 印刷・板書用 高解像度図形（A4横）</h2>
+            <div class="flex gap-2">
+              <button id="print-btn" type="button" class="tool-btn">🖨️ 印刷 / PDF保存</button>
+              <button id="download-svg-btn" type="button" class="tool-btn">⬇️ SVG保存</button>
+            </div>
+          </div>
+          <!-- A4横比率 (1.414:1) のプレビュー枠：そのまま電子黒板投影・印刷可 -->
+          <div id="print-preview-frame" class="a4-landscape mx-auto border rounded-lg overflow-hidden bg-white">
+            <svg id="print-figure-svg" viewBox="0 0 1123 794" class="w-full h-auto block" role="img" aria-label="印刷用高解像度図形">
+              <g id="print-geometry-layer"></g>
+            </svg>
+          </div>
+          <p class="text-xs text-slate-500 mt-2">※ A4横サイズ比率で作成されています。ブラウザの印刷で「横向き・背景グラフィックON」にすると綺麗にPDF化できます。</p>
+        </section>
+
+        <!-- ワークシート・問題集タブ -->
+        <section id="panel-worksheet" role="tabpanel" aria-labelledby="tab-worksheet" data-teacher-panel="worksheet" class="teacher-panel hidden bg-white rounded-2xl shadow p-5">
+          <h2 class="font-extrabold mb-3">📋 ワークシート・小テスト</h2>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="border rounded-xl p-4">
+              <h3 class="font-bold mb-2">❓ 問い</h3>
+              <div id="quiz-questions" class="text-sm space-y-2"><p class="text-slate-400">生成後に表示されます。</p></div>
+            </div>
+            <div class="border rounded-xl p-4">
+              <h3 class="font-bold mb-2">✅ 解答</h3>
+              <div id="quiz-answers" class="text-sm space-y-2"><p class="text-slate-400">生成後に表示されます。</p></div>
+            </div>
+          </div>
+          <div class="border rounded-xl p-4 mt-4">
+            <h3 class="font-bold mb-2">📐 評価基準（3観点ループリック）</h3>
+            <div id="quiz-rubric" class="text-sm"><p class="text-slate-400">生成後に表示されます。</p></div>
+          </div>
+          <div class="mt-3 text-right">
+            <button id="print-worksheet-btn" type="button" class="tool-btn">🖨️ ワークシートを印刷</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ローディング表示 -->
+      <div id="loading-overlay" class="hidden fixed inset-0 z-50 bg-black/40 items-center justify-center" role="status" aria-live="assertive">
+        <div class="bg-white rounded-2xl px-8 py-6 text-center shadow-2xl">
+          <div class="loader mx-auto mb-3"></div>
+          <p id="loading-text" class="font-bold">図形を生成しています…</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <footer id="app-footer" class="text-center text-xs text-slate-500 py-4">
+    インタラクティブ図形学習支援ツール ｜ FastAPI × SVG/Canvas ｜ GeoGebra風ドラッグ操作・JSON保存対応予定
+  </footer>
+
+  <!-- アプリロジック（描画エンジン → 制御の順で読込） -->
+  <script src="js/renderer.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>
