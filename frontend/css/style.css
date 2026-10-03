@@ -162,6 +162,32 @@
   width: max-content;
   max-width: calc(100% - 70px);
 }
+/* バー形状：正方形グリッド・縦長 */
+#construct-toolbar.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
+}
+#construct-toolbar.layout-col {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  max-height: 320px;
+}
+#construct-layout-btn {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 5px 8px;
+  font-size: 14px;
+  border-radius: 0.6rem;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  cursor: pointer;
+  color: #475569;
+}
+#construct-layout-btn:hover {
+  border-color: #f59e00;
+}
 #construct-grip {
   cursor: grab;
   touch-action: none;

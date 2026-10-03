@@ -881,6 +881,42 @@
         applyConstructBar();
       });
     }
+    // バー形状切替（横長→正方形→縦長）
+    var layoutBtn = $('construct-layout-btn');
+    var LAYOUT_MODES = [
+      { key: 'row', icon: '▬', cls: '' },
+      { key: 'grid', icon: '◫', cls: 'layout-grid' },
+      { key: 'col', icon: '▮', cls: 'layout-col' }
+    ];
+    function applyConstructLayout(mode) {
+      if (!cToolbar) return mode;
+      var found = LAYOUT_MODES[0];
+      LAYOUT_MODES.forEach(function (m) {
+        cToolbar.classList.toggle(m.cls, !!m.cls && m.key === mode);
+        if (m.key === mode) found = m;
+      });
+      if (layoutBtn) layoutBtn.textContent = found.icon;
+      // 形状変化ではみ出さないよう位置を締め直す
+      if (cToolbar.classList.contains('construct-free') && cContainer) {
+        var cRect = cContainer.getBoundingClientRect();
+        var l = parseFloat(cToolbar.style.left) || 0;
+        var t = parseFloat(cToolbar.style.top) || 0;
+        cToolbar.style.left = Math.max(0, Math.min(Math.max(0, cRect.width - cToolbar.offsetWidth), l)) + 'px';
+        cToolbar.style.top = Math.max(0, Math.min(Math.max(0, cRect.height - cToolbar.offsetHeight), t)) + 'px';
+        saveLayout({ constructBar: { free: true, left: cToolbar.style.left, top: cToolbar.style.top } });
+      }
+      return found.key;
+    }
+    var savedMode = loadLayout().constructLayout || 'row';
+    savedMode = applyConstructLayout(savedMode);
+    if (layoutBtn) layoutBtn.addEventListener('click', function () {
+      var cur = loadLayout().constructLayout || 'row';
+      var idx = 0;
+      LAYOUT_MODES.forEach(function (m, i) { if (m.key === cur) idx = i; });
+      var next = LAYOUT_MODES[(idx + 1) % LAYOUT_MODES.length].key;
+      applyConstructLayout(next);
+      saveLayout({ constructLayout: next });
+    });
 
     // 3D折りたたみ（初回展開時に遅延初期化・ヘッダーボタンと連動）
     var solidToggle = $('solid-toggle-btn');
