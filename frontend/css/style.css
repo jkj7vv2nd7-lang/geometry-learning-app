@@ -1,0 +1,604 @@
+/* ============================================================
+ * インタラクティブ図形学習支援ツール — style.css
+ * Tailwind CSS のベースを補完するコンポーネント固有スタイル
+ * 方針: Tailwindクラスと競合しない独自クラス名のみ定義する
+ * ============================================================ */
+
+:root {
+  /* 児童・生徒モード（青・水色ベース） */
+  --student-primary: #2563eb;
+  --student-primary-dark: #1d4ed8;
+  --student-primary-light: #eff6ff;
+  --student-accent: #38bdf8;
+  /* 教師モード（緑・エメラルドベース） */
+  --teacher-primary: #059669;
+  --teacher-primary-dark: #047857;
+  --teacher-primary-light: #ecfdf5;
+  --teacher-accent: #34d399;
+  /* 共通 */
+  --card-shadow: 0 10px 25px -8px rgba(15, 23, 42, 0.18), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+  --grid-line: #e5e7eb;
+  --radius-lg: 1rem;
+  --transition-smooth: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease,
+    box-shadow 0.3s ease, transform 0.15s ease;
+}
+
+/* ---------- ベース ---------- */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+    "Yu Gothic", Meiryo, system-ui, sans-serif;
+  transition: var(--transition-smooth);
+}
+
+/* モード別のページ背景（data-mode 属性 / クラス両対応） */
+body[data-mode="student"],
+body.student-mode {
+  background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 240px, #f1f5f9 100%);
+}
+body[data-mode="teacher"],
+body.teacher-mode {
+  background: linear-gradient(180deg, #ecfdf5 0%, #f8fafc 240px, #f1f5f9 100%);
+}
+
+/* ============================================================
+ * 1. ヘッダー & モード切り替え
+ * ============================================================ */
+.mode-header {
+  transition: var(--transition-smooth);
+  color: #fff;
+}
+body[data-mode="student"] .mode-header,
+body.student-mode .mode-header {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 60%, #38bdf8 100%);
+}
+body[data-mode="teacher"] .mode-header,
+body.teacher-mode .mode-header {
+  background: linear-gradient(135deg, #059669 0%, #10b981 60%, #34d399 100%);
+}
+
+/* モードタブボタン */
+.mode-tab-btn {
+  min-height: 44px;
+  min-width: 44px;
+  color: #334155;
+  background: transparent;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.mode-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+.mode-tab-btn:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+body[data-mode="student"] .mode-tab-active,
+body.student-mode .mode-tab-active {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45);
+}
+body[data-mode="teacher"] .mode-tab-active,
+body.teacher-mode .mode-tab-active {
+  background: #059669;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
+}
+
+/* ============================================================
+ * 2. 図形描画キャンバス
+ * ============================================================ */
+#canvas-container {
+  background-color: #f9fafb;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* 方眼紙グリッド背景：SVG側のpatternと重ねても破綻しないCSS側の下地 */
+.bg-grid {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: center center;
+}
+
+#geometry-canvas {
+  background-color: #ffffff;
+  display: block;
+  border-radius: 0 0 1rem 1rem;
+  /* 高級感のある立体的なカード内シャドウ */
+  box-shadow: inset 0 2px 10px rgba(15, 23, 42, 0.06);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* SVG内のドラッグ可能点（将来のGeoGebra風操作用） */
+#geometry-canvas .draggable-point {
+  cursor: grab;
+  stroke: #fff;
+  stroke-width: 2;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+  transition: transform 0.15s ease, r 0.15s ease;
+}
+#geometry-canvas .draggable-point:hover {
+  transform: scale(1.15);
+}
+#geometry-canvas .draggable-point:active {
+  cursor: grabbing;
+}
+#geometry-canvas .draggable-line {
+  cursor: move;
+}
+#geometry-canvas .measure-label {
+  font-size: 13px;
+  fill: #0f172a;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+  font-weight: 700;
+}
+
+/* リアルタイム計測値バッジ */
+#measurement-display {
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  line-height: 1.6;
+  max-width: calc(100% - 1.5rem);
+}
+
+/* キャンバスツールバー */
+#canvas-toolbar .status-dot {
+  font-size: 12px;
+  font-weight: 700;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  padding: 6px 12px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ============================================================
+ * 3. ボタン・タブ（タッチ操作配慮：大きめクリック領域）
+ * ============================================================ */
+#generate-btn {
+  transition: var(--transition-smooth);
+}
+body[data-mode="student"] #generate-btn,
+body.student-mode #generate-btn {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+}
+body[data-mode="student"] #generate-btn:hover,
+body.student-mode #generate-btn:hover {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  transform: translateY(-1px);
+}
+body[data-mode="teacher"] #generate-btn,
+body.teacher-mode #generate-btn {
+  background: linear-gradient(135deg, #059669, #10b981);
+  box-shadow: 0 8px 20px rgba(5, 150, 105, 0.4);
+}
+body[data-mode="teacher"] #generate-btn:hover,
+body.teacher-mode #generate-btn:hover {
+  background: linear-gradient(135deg, #047857, #059669);
+  transform: translateY(-1px);
+}
+#generate-btn:active {
+  transform: scale(0.98);
+}
+#generate-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+  transform: none;
+}
+
+/* サブアクション・ツールボタン */
+.sub-action-btn,
+.tool-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 14px;
+  border-radius: 0.75rem;
+  font-weight: 700;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.sub-action-btn:hover,
+.tool-btn:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+}
+.sub-action-btn:active,
+.tool-btn:active {
+  transform: scale(0.97);
+}
+body[data-mode="teacher"] .tool-btn:hover,
+body.teacher-mode .tool-btn:hover {
+  border-color: #6ee7b7;
+}
+
+/* 入力例チップ */
+.prompt-example-chip {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+body[data-mode="student"] .prompt-example-chip:hover,
+body.student-mode .prompt-example-chip:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+body[data-mode="teacher"] .prompt-example-chip:hover,
+body.teacher-mode .prompt-example-chip:hover {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+
+/* 送信・追加ボタン */
+#chat-send-btn,
+#add-url-btn {
+  transition: var(--transition-smooth);
+  color: #fff;
+  min-height: 44px;
+}
+body[data-mode="student"] #chat-send-btn,
+body.student-mode #chat-send-btn,
+body[data-mode="student"] #add-url-btn,
+body.student-mode #add-url-btn {
+  background: #2563eb;
+}
+body[data-mode="student"] #chat-send-btn:hover,
+body.student-mode #chat-send-btn:hover,
+body[data-mode="student"] #add-url-btn:hover,
+body.student-mode #add-url-btn:hover {
+  background: #1d4ed8;
+}
+body[data-mode="teacher"] #chat-send-btn,
+body.teacher-mode #chat-send-btn,
+body[data-mode="teacher"] #add-url-btn,
+body.teacher-mode #add-url-btn {
+  background: #059669;
+}
+body[data-mode="teacher"] #chat-send-btn:hover,
+body.teacher-mode #chat-send-btn:hover,
+body[data-mode="teacher"] #add-url-btn:hover,
+body.teacher-mode #add-url-btn:hover {
+  background: #047857;
+}
+
+/* 教師用タブ */
+.teacher-tab {
+  min-height: 48px;
+  padding: 12px 16px;
+  border-radius: 0.9rem;
+  font-weight: 800;
+  font-size: 14px;
+  color: #475569;
+  background: #f8fafc;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  flex: 1;
+}
+.teacher-tab:hover {
+  background: #ecfdf5;
+  transform: translateY(-1px);
+}
+.teacher-tab-active {
+  background: #059669 !important;
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+}
+
+/* ============================================================
+ * 4. アップロードゾーン（ドラッグ＆ドロップ）
+ * ============================================================ */
+#teacher-source-area {
+  transition: var(--transition-smooth);
+}
+#teacher-source-area.teacher-locked {
+  opacity: 0.55;
+  background: #f8fafc repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 10px,
+    rgba(148, 163, 184, 0.08) 10px,
+    rgba(148, 163, 184, 0.08) 20px
+  );
+}
+#teacher-source-area.teacher-active {
+  opacity: 1;
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+}
+#teacher-only-badge {
+  transition: var(--transition-smooth);
+}
+body[data-mode="student"] #teacher-only-badge,
+body.student-mode #teacher-only-badge {
+  background: #e2e8f0;
+  color: #64748b;
+}
+body[data-mode="teacher"] #teacher-only-badge,
+body.teacher-mode #teacher-only-badge {
+  background: #059669;
+  color: #fff;
+}
+
+.upload-zone {
+  border: 2px dashed #cbd5e1;
+  background: #f8fafc;
+  transition: var(--transition-smooth);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.upload-zone:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+.upload-zone:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 2px;
+}
+/* JSがファイルホバー時に付与するクラス */
+.upload-zone.drag-over {
+  border-color: #059669;
+  border-style: solid;
+  background: #d1fae5;
+  box-shadow: inset 0 0 0 4px rgba(5, 150, 105, 0.15), 0 8px 20px rgba(5, 150, 105, 0.25);
+  transform: scale(0.99);
+}
+body[data-mode="student"] .upload-zone.drag-over,
+body.student-mode .upload-zone.drag-over {
+  border-color: #2563eb;
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 4px rgba(37, 99, 235, 0.15), 0 8px 20px rgba(37, 99, 235, 0.25);
+}
+.upload-zone.upload-success {
+  border-color: #16a34a;
+  border-style: solid;
+  background: #f0fdf4;
+}
+
+/* ============================================================
+ * 5. 可読性：解説・指導案・チャット
+ * ============================================================ */
+#chat-messages,
+#lesson-plan-output,
+#quiz-questions,
+#quiz-answers,
+#quiz-rubric {
+  font-size: 15px;
+  line-height: 1.9; /* leading-relaxed 相当 */
+  letter-spacing: 0.02em;
+  word-break: break-word;
+}
+#lesson-plan-output h1,
+#lesson-plan-output h2,
+#lesson-plan-output h3 {
+  font-weight: 800;
+  margin: 1.2em 0 0.5em;
+  line-height: 1.6;
+}
+#lesson-plan-output h2 {
+  font-size: 1.15em;
+  padding-left: 0.6em;
+  border-left: 5px solid var(--teacher-primary);
+}
+body[data-mode="student"] #lesson-plan-output h2,
+body.student-mode #lesson-plan-output h2 {
+  border-left-color: var(--student-primary);
+}
+#lesson-plan-output p,
+#lesson-plan-output ul,
+#lesson-plan-output ol {
+  margin: 0.6em 0;
+}
+#lesson-plan-output ul,
+#lesson-plan-output ol {
+  padding-left: 1.4em;
+}
+#lesson-plan-output table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+  font-size: 14px;
+}
+#lesson-plan-output th,
+#lesson-plan-output td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 10px;
+}
+#lesson-plan-output th {
+  background: #f8fafc;
+}
+
+/* チャット吹き出し */
+.chat-bubble-ai,
+.chat-bubble-user {
+  max-width: 90%;
+  padding: 12px 16px;
+  border-radius: 1rem;
+  line-height: 1.9;
+  font-size: 14.5px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+.chat-bubble-ai {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-top-left-radius: 0.25rem;
+  margin-right: auto;
+}
+body[data-mode="teacher"] .chat-bubble-ai,
+body.teacher-mode .chat-bubble-ai {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+.chat-bubble-user {
+  color: #fff;
+  border-top-right-radius: 0.25rem;
+  margin-left: auto;
+  transition: var(--transition-smooth);
+}
+body[data-mode="student"] .chat-bubble-user,
+body.student-mode .chat-bubble-user {
+  background: #2563eb;
+}
+body[data-mode="teacher"] .chat-bubble-user,
+body.teacher-mode .chat-bubble-user {
+  background: #059669;
+}
+
+/* モダンで細めのスクロールバー */
+#chat-messages,
+#lesson-plan-output,
+#source-file-list,
+#source-url-list {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+#chat-messages::-webkit-scrollbar,
+#lesson-plan-output::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+#chat-messages::-webkit-scrollbar-track,
+#lesson-plan-output::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 8px;
+}
+#chat-messages::-webkit-scrollbar-thumb,
+#lesson-plan-output::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+#chat-messages::-webkit-scrollbar-thumb:hover,
+#lesson-plan-output::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ============================================================
+ * 6. 印刷・板書用プレビュー（A4横）
+ * ============================================================ */
+.a4-landscape {
+  aspect-ratio: 1.414 / 1;
+  max-width: 900px;
+  box-shadow: var(--card-shadow);
+}
+#print-preview-frame {
+  background: #fff;
+}
+#print-figure-svg {
+  background: #fff;
+}
+
+/* ============================================================
+ * 7. ローダー・その他
+ * ============================================================ */
+.loader {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 5px solid #e2e8f0;
+  border-top-color: var(--student-primary);
+  animation: spin 0.9s linear infinite;
+}
+body[data-mode="teacher"] .loader,
+body.teacher-mode .loader {
+  border-top-color: var(--teacher-primary);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#loading-overlay {
+  backdrop-filter: blur(2px);
+}
+#loading-overlay:not(.hidden) {
+  display: flex;
+}
+
+/* フォーカス可視化（アクセシビリティ） */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 1px;
+}
+
+/* ============================================================
+ * 8. レスポンシブ微調整（タブレット・電子黒板）
+ * ============================================================ */
+@media (max-width: 1023px) {
+  #control-panel {
+    position: static !important;
+  }
+  .teacher-tab {
+    font-size: 15px;
+    min-height: 52px;
+  }
+}
+
+/* 電子黒板など大画面：タッチターゲット拡大 */
+@media (min-width: 1600px) {
+  body {
+    font-size: 17px;
+  }
+  .sub-action-btn,
+  .tool-btn {
+    font-size: 15px;
+  }
+}
+
+/* 印刷時：図形と指導案のみきれいに出力 */
+@media print {
+  #app-header,
+  #control-panel,
+  #app-footer,
+  #chat-section,
+  #teacher-tabs,
+  #loading-overlay {
+    display: none !important;
+  }
+  #app-layout {
+    display: block;
+    padding: 0;
+  }
+  #print-preview-frame {
+    box-shadow: none;
+    border: none;
+    max-width: none;
+  }
+}
