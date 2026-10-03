@@ -837,24 +837,60 @@
       saveLayout({ toolsHidden: !show });
     });
 
-    // 3D折りたたみ（初回展開時に遅延初期化）
+    // 3D折りたたみ（初回展開時に遅延初期化・ヘッダーボタンと連動）
     var solidToggle = $('solid-toggle-btn');
     var solidBody = $('solid-body');
-    function applySolid(open) {
+    var headerSolidBtn = $('header-solid-btn');
+    var solidSection = $('solid-section');
+    function applySolid(open, scroll) {
       if (!solidBody) return;
       solidBody.classList.toggle('hidden', !open);
       if (solidToggle) {
         solidToggle.textContent = open ? '▼ 閉じる' : '▶ 開く';
         solidToggle.setAttribute('aria-expanded', String(open));
       }
-      if (open && window.SolidViewer) window.SolidViewer.expand();
+      if (headerSolidBtn) {
+        headerSolidBtn.textContent = open ? '🧊 立体表示中' : '🧊 立体';
+        headerSolidBtn.setAttribute('aria-pressed', String(open));
+      }
+      if (open) {
+        if (window.SolidViewer) window.SolidViewer.expand();
+        if (scroll && solidSection && solidSection.scrollIntoView) {
+          solidSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
     }
-    applySolid(!!pref.solidOpen);
-    if (solidToggle) solidToggle.addEventListener('click', function () {
+    applySolid(!!pref.solidOpen, false);
+    function toggleSolidFromUI(scroll) {
       var open = solidBody.classList.contains('hidden');
-      applySolid(open);
+      applySolid(open, scroll);
       saveLayout({ solidOpen: open });
-    });
+    }
+    if (solidToggle) solidToggle.addEventListener('click', function () { toggleSolidFromUI(false); });
+    if (headerSolidBtn) headerSolidBtn.addEventListener('click', function () { toggleSolidFromUI(true); });
+
+    // チャット・記録帳の開閉（ツールバー感覚で見え隠れ）
+    function wireCollapsible(toggleId, bodyId, prefKey, openLabel, closeLabel) {
+      var tBtn = $(toggleId), body = $(bodyId);
+      if (!tBtn || !body) return;
+      var stored = loadLayout()[prefKey];
+      var isOpen = (stored === undefined) ? true : !!stored;
+      applyCollapsible(tBtn, body, isOpen, openLabel, closeLabel);
+      tBtn.addEventListener('click', function () {
+        var open = body.classList.contains('hidden');
+        applyCollapsible(tBtn, body, open, openLabel, closeLabel);
+        var patch = {};
+        patch[prefKey] = open;
+        saveLayout(patch);
+      });
+    }
+    function applyCollapsible(tBtn, body, open, openLabel, closeLabel) {
+      body.classList.toggle('hidden', !open);
+      tBtn.textContent = open ? closeLabel : openLabel;
+      tBtn.setAttribute('aria-expanded', String(open));
+    }
+    wireCollapsible('chat-toggle-btn', 'chat-body', 'chatOpen', '▶ 開く', '▼ 閉じる');
+    wireCollapsible('journal-toggle-btn', 'journal-body', 'journalOpen', '▶ 開く', '▼ 閉じる');
   }
 
   function initMisc() {
