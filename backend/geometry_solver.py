@@ -293,7 +293,6 @@ def parse_and_build(prompt_text: str) -> Dict:
 
 
 def recalculate(points: Dict[str, Dict[str, float]], with_incircle: bool = True) -> Dict:
-    """ドラッグ後の再計算（/api/recalculate 用）。"""
     out: Dict = {"points": points, "measurements": compute_measurements(points)}
     if with_incircle and all(k in points for k in ("A", "B", "C")):
         try:
@@ -301,3 +300,122 @@ def recalculate(points: Dict[str, Dict[str, float]], with_incircle: bool = True)
         except ValueError:
             out["incircle"] = None
     return out
+
+
+# ---------------- 作図検証（学習者用・/api/verify-construction 用） ----------------
+# LLM不使用。作図データの幾何学的性質を決定論的に判定する。
+
+def _seg_len(pts: Dict[str, Dict[str, float]], a: str, b: str) -> float:
+    return _dist(pts[a]["x"], pts[a]["y"], pts[b]["x"], pts[b]["y"])
+
+
+def _seg_angle(pts: Dict[str, Dict[str, float]], a: str, b: str) -> float:
+    """線分ABの方向角（度）。平行・垂直判定用。"""
+    return math.degrees(math.atan2(pts[b]["y"] - pts[a]["y"], pts[b]["x"] - pts[a]["x"])) % 180.0
+
+
+def _ang_diff(d1: float, d2: float) -> float:
+    d = abs(d1 - d2) % 180.0
+    return min(d, 180.0 - d)
+
+
+def verify_construction(data: Dict) -> List[Dict]:
+    """作図データの性質チェック。[{name, passed, detail}] を返す。
+
+    data: {points:{name:{x,y}}, segments:[[a,b]], circles:[[c,p]], angles:[[v,a,b]], perps:[...]}
+    許容誤差: 角度±2°、三平方の定理は相対誤差3%以内。
+    """
+    checks: List[Dict] = []
+    pts = data.get("points", {}) or {}
+    segs = [s for s in (data.get("segments", []) or []) if s[0] in pts and s[1] in pts]
+    names = list(pts.keys())
+
+    def add(name: str, passed: bool, detail: str = "") -> None:
+        checks.append({"name": name, "passed": bool(passed), "detail": detail})
+
+    if len(names) < 2:
+        add("作図の開始", False, "点を2つ以上打ってみよう。ツールバーの「● 点」を使います。")
+        return checks
+    add("作図の開始", True, f"点が{len(names)}個あります。")
+
+    # 直角の検出（共有頂点を持つ2線分の角度）
+    adj: Dict[str, List[str]] = {n: [] for n in names}
+    for a, b in segs:
+        adj[a].append(b)
+        adj[b].append(a)
+    right_found = []
+    for v, others in adj.items():
+        for i in range(len(others)):
+            for j in range(i + 1, len(others)):
+                deg = _angle_at_vertex(
+                    pts[v]["x"], pts[v]["y"],
+                    pts[others[i]]["x"], pts[others[i]]["y"],
+                    pts[others[j]]["x"], pts[others[j]]["y"],
+                )
+                if abs(deg - 90.0) <= 2.0:
+                    right_found.append((v, others[i], others[j], round(deg, 1)))
+    if right_found:
+        v, a, b, deg = right_found[0]
+        add("直角の発見", True, f"点{v}の角{a}{v}{b}が{deg}°で直角です。")
+    else:
+        add("直角の発見", False, "直角はまだありません。「⊥ 垂線」ツールが近道です。")
+
+    # 三平方の定理（直角三角形の3辺で a^2+b^2=c^2）
+    pytha_ok = False
+    for v, a, b in [(r[0], r[1], r[2]) for r in right_found]:
+        sides = sorted([_seg_len(pts, v, a), _seg_len(pts, v, b), _seg_len(pts, a, b)])
+        if sides[2] > 0 and abs(sides[0] ** 2 + sides[1] ** 2 - sides[2] ** 2) / (sides[2] ** 2) <= 0.03:
+            pytha_ok = True
+            add("三平方の定理", True,
+                f"△{v}{a}{b}で {sides[0]:.0f}²＋{sides[1]:.0f}²≒{sides[2]:.0f}² が成り立っています。")
+            break
+    if not pytha_ok and right_found:
+        add("三平方の定理", False, "直角はありますが計算が合いません。点をドラッグして整えてみよう。")
+
+    # 等しい長さの組
+    if len(segs) >= 2:
+        lens = [(_seg_len(pts, a, b), a, b) for a, b in segs]
+        found = False
+        for i in range(len(lens)):
+            for j in range(i + 1, len(lens)):
+                if abs(lens[i][0] - lens[j][0]) <= max(3.0, lens[i][0] * 0.02):
+                    add("等しい長さ", True,
+                        f"辺{lens[i][1]}{lens[i][2]}＝辺{lens[j][1]}{lens[j][2]}（約{lens[i][0]:.0f}）です。二等辺三角形のヒント！")
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            add("等しい長さ", False, "等しい長さの組はまだありません。")
+    # 平行・垂直な組
+    if len(segs) >= 2:
+        dirs = [(_seg_angle(pts, a, b), a, b) for a, b in segs]
+        para = perp = False
+        for i in range(len(dirs)):
+            for j in range(i + 1, len(dirs)):
+                d = _ang_diff(dirs[i][0], dirs[j][0])
+                if d <= 2.0:
+                    para = (dirs[i], dirs[j])
+                if abs(d - 90.0) <= 2.0:
+                    perp = (dirs[i], dirs[j])
+        if para:
+            add("平行な辺", True,
+                f"辺{para[0][1]}{para[0][2]}と辺{para[1][1]}{para[1][2]}は平行です。")
+        if perp:
+            add("垂直な辺", True,
+                f"辺{perp[0][1]}{perp[0][2]}と辺{perp[1][1]}{perp[1][2]}は垂直です。")
+        if not para and not perp:
+            add("平行・垂直", False, "平行・垂直な組はまだありません。")
+    # 円の測定
+    for c, p in (data.get("circles", []) or []):
+        if c in pts and p in pts:
+            r = _seg_len(pts, c, p)
+            add("円の半径", True, f"中心{c}・半径約{r:.0f}の円です。円周上の点をドラッグしても半径は保たれます。")
+    # 角度ツール測定値の報告
+    for item in (data.get("angles", []) or []):
+        v, a, b = item[0], item[1], item[2]
+        if v in pts and a in pts and b in pts:
+            deg = _angle_at_vertex(
+                pts[v]["x"], pts[v]["y"], pts[a]["x"], pts[a]["y"], pts[b]["x"], pts[b]["y"])
+            add(f"角{a}{v}{b}の測定", True, f"{deg:.1f}°です。")
+    return checks

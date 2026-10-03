@@ -9,6 +9,8 @@
   var API_BASE = ''; // 同一オリジン配信時は '' のまま。分離時は 'http://localhost:8000' 等に変更
   var ENDPOINT_GENERATE = API_BASE + '/api/generate-geometry';
   var ENDPOINT_CHAT = API_BASE + '/api/chat';
+  var ENDPOINT_VERIFY = API_BASE + '/api/verify-construction';
+  var CONSTRUCT_STORE_KEY = 'construction-v1';
 
   // ---------- ヘルパー ----------
   function $(id) { return document.getElementById(id); }
@@ -412,6 +414,100 @@
   }
 
   // ---------- その他UI ----------
+  // ---------- 作図ボード（学習者用・探求キャンバス） ----------
+  function initConstructionBoard() {
+    var CB = window.ConstructionBoard;
+    var svg = $('geometry-canvas');
+    if (!CB || !svg) return;
+
+    // ツール切替
+    document.querySelectorAll('[data-construct-tool]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        CB.setTool(btn.getAttribute('data-construct-tool'));
+        document.querySelectorAll('[data-construct-tool]').forEach(function (b) {
+          b.classList.toggle('construct-tool-active', b === btn);
+        });
+        setStatus('作図中: ' + btn.textContent.trim(), null);
+      });
+    });
+    // キャンバスクリック → 作図操作（AI生成図と競合しないよう作図ツール操作時のみ）
+    svg.addEventListener('click', function (e) {
+      if (CB.getTool() === 'select') return;
+      CB.handleClick(svg, e);
+    });
+    CB.attachDrag(svg);
+
+    // 吸着トグル
+    var snapBtn = $('toggle-snap-btn');
+    if (snapBtn) snapBtn.addEventListener('click', function () {
+      CB.setSnap(!CB.isSnap());
+      snapBtn.textContent = CB.isSnap() ? '🧲 吸着ON' : '🧲 吸着OFF';
+      snapBtn.setAttribute('aria-pressed', String(CB.isSnap()));
+    });
+    // 全消去
+    var clr = $('clear-construct-btn');
+    if (clr) clr.addEventListener('click', function () {
+      if (!confirm('作図をすべて消去しますか？')) return;
+      CB.clear();
+      try { localStorage.removeItem(CONSTRUCT_STORE_KEY); } catch (_) {}
+    });
+    // 変更のたびに自動保存＋計測表示
+    CB.setOnChange(function (data) {
+      try { localStorage.setItem(CONSTRUCT_STORE_KEY, JSON.stringify(data)); } catch (_) {}
+      var st = CB.stats();
+      if (!window.GeometryRenderer.getCurrentData()) {
+        var box = $('measurement-display');
+        if (box && (st.points > 0)) {
+          box.textContent = '✏️ 作図中: 点' + st.points + '・線分' + st.segments +
+            '・円' + st.circles + '・角度' + st.angles;
+        }
+      }
+    });
+    // 前回の作図を復元
+    try {
+      var saved = localStorage.getItem(CONSTRUCT_STORE_KEY);
+      if (saved) CB.load(JSON.parse(saved));
+    } catch (_) {}
+
+    // AI検証
+    var vf = $('verify-construction-btn');
+    if (vf) vf.addEventListener('click', handleVerifyConstruction);
+  }
+
+  async function handleVerifyConstruction() {
+    var CB = window.ConstructionBoard;
+    if (!CB) return;
+    var data = CB.serialize();
+    if (Object.keys(data.points).length < 2) {
+      addChatMessage('✏️ まず点を2つ以上打って、何か作図してみよう。「● 点」ツールでキャンバスをタップ！', 'ai');
+      return;
+    }
+    var query = ($('geometry-prompt-input') && $('geometry-prompt-input').value.trim()) || '';
+    showLoading('AI先生が作図を検証中...');
+    try {
+      var res = await fetch(ENDPOINT_VERIFY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          construction: data,
+          query: query,
+          grade: $('grade-select') ? $('grade-select').value : 'elementary-high'
+        })
+      });
+      if (!res.ok) throw new Error('status ' + res.status);
+      var out = await res.json();
+      var md = '## 🔍 作図検証結果\n\n' + out.checks.map(function (c) {
+        return (c.passed ? '✅ ' : '⬜ ') + '**' + c.name + '**：' + c.detail;
+      }).join('\n\n') + '\n\n---\n\n' + out.ai_comment;
+      addChatMessage(md, 'ai');
+      setStatus('検証完了', true);
+    } catch (err) {
+      showError('作図検証に失敗しました: ' + err.message);
+    } finally {
+      hideLoading();
+    }
+  }
+
   function initMisc() {
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
@@ -482,6 +578,7 @@
     initTeacherTabs();
     initUploadZone();
     initJsonButtons();
+    initConstructionBoard();
     initMisc();
     setStatus('待機中', null);
   });

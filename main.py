@@ -26,11 +26,14 @@ from backend import ai_agent
 from backend.schemas import (
     ChatRequest,
     ChatResponse,
+    ConstructionCheck,
     GeometryData,
     GeometryResponse,
     Measurements,
     RecalculateRequest,
     RecalculateResponse,
+    VerifyRequest,
+    VerifyResponse,
     Worksheet,
 )
 
@@ -206,6 +209,27 @@ def recalculate(req: RecalculateRequest) -> RecalculateResponse:
 async def chat(req: ChatRequest) -> ChatResponse:
     reply, _provider = ai_agent.generate_chat_reply(req.message, req.grade, req.mode)
     return ChatResponse(reply=reply)
+
+
+@app.post("/api/verify-construction", response_model=VerifyResponse)
+async def verify_construction(req: VerifyRequest) -> VerifyResponse:
+    """学習者の作図を検証する（solverの正確な判定＋AIの応援コメント）。"""
+    c = req.construction
+    data = {
+        "points": {k: {"x": v.x, "y": v.y} for k, v in c.points.items()},
+        "segments": [list(s) for s in c.segments],
+        "lines": [list(s) for s in c.lines],
+        "circles": [list(s) for s in c.circles],
+        "perps": c.perps,
+        "angles": [list(a) for a in c.angles],
+    }
+    raw_checks = solver.verify_construction(data)
+    checks = [ConstructionCheck(**ch) for ch in raw_checks]
+    summary = "\n".join(
+        f"{'✅' if ch.passed else '⬜'} {ch.name}: {ch.detail}" for ch in checks
+    )
+    comment, provider = ai_agent.comment_on_construction(summary, req.query, req.grade)
+    return VerifyResponse(checks=checks, ai_comment=comment, provider=provider)
 
 
 # ---------------- 静的配信（frontend/index.html等） ----------------

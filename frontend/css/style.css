@@ -4,6 +4,48 @@
  * 方針: Tailwindクラスと競合しない独自クラス名のみ定義する
  * ============================================================ */
 
+/* ============================================================
+ * 9. 作図ツールバー（学習者用・探求キャンバス）
+ * ============================================================ */
+#construct-toolbar {
+  border-bottom: 1px solid #e2e8f0;
+}
+.construct-tool {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  border-radius: 0.75rem;
+  font-weight: 800;
+  font-size: 13px;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.construct-tool:hover {
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+.construct-tool-active {
+  background: #f59e00 !important;
+  border-color: #b45309 !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 0, 0.45);
+}
+.verify-btn {
+  background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+#geometry-canvas .construct-point {
+  cursor: grab;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}
+#geometry-canvas .construct-point:active {
+  cursor: grabbing;
+}
+
 :root {
   /* 児童・生徒モード（青・水色ベース） */
   --student-primary: #2563eb;

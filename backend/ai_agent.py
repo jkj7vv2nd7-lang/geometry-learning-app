@@ -1044,3 +1044,32 @@ def generate_chat_reply(message: str, grade: str = "student", mode: str = "stude
         "- 気づいたことを友だちと説明し合ってみよう。",
         used,
     )
+
+
+CONSTRUCTION_COMMENT_SYSTEM = (
+    "あなたは小中高生の探求を応援する算数・数学の先生です。"
+    "【作図の検証結果】（正確な計算機の出力）を根拠に、"
+    "児童・生徒の作図をほめ、次の探求（点を動かす実験・予想の言語化）へ誘う短いコメントを書いてください。"
+    "数値の捏造は禁止です。200字以内・Markdown形式・優しい言葉づかいで。"
+)
+
+
+def comment_on_construction(
+    checks_text: str, query: str = "", grade: str = "elementary-high"
+) -> Tuple[str, AIProvider]:
+    """作図検証コメントの共通エントリーポイント（プロバイダ非依存）。"""
+    user = f"児童の問い: {query or '（なし）'}\n学年: {grade}\n【作図の検証結果】\n{checks_text}"
+    text, used = _generate_text_auto(CONSTRUCTION_COMMENT_SYSTEM, user)
+    if text:
+        return text, used
+    if get_active_provider() == "none":
+        return (
+            f"⚠️ {NO_API_KEY_WARNING}\n\n作図の検証結果は以下の通りです。\n\n{checks_text}\n\n"
+            "点をドラッグして、変わるもの・変わらないものを観察してみよう。",
+            "none",
+        )
+    return (
+        f"作図の検証結果は以下の通りです。\n\n{checks_text}\n\n"
+        "点をドラッグして、変わるもの・変わらないものを観察してみよう。",
+        used,
+    )

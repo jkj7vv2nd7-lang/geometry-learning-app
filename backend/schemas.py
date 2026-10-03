@@ -111,3 +111,32 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+
+class ConstructionData(BaseModel):
+    """作図ボードのシリアライズ形式（ConstructionBoard.serialize() と対応）。"""
+
+    points: Dict[str, Point] = Field(default_factory=dict)
+    segments: List[List[str]] = Field(default_factory=list, description="線分 [始点名, 終点名]")
+    lines: List[List[str]] = Field(default_factory=list)
+    circles: List[List[str]] = Field(default_factory=list, description="円 [中心名, 円周点名]")
+    perps: List[Dict[str, object]] = Field(default_factory=list)
+    angles: List[List[str]] = Field(default_factory=list, description="角度 [頂点, 点A, 点B]")
+
+
+class VerifyRequest(BaseModel):
+    construction: ConstructionData
+    query: str = Field(default="", description="児童の問い（例：直角三角形を作りたい）")
+    grade: str = "elementary-high"
+
+
+class ConstructionCheck(BaseModel):
+    name: str
+    passed: bool
+    detail: str = ""
+
+
+class VerifyResponse(BaseModel):
+    checks: List[ConstructionCheck] = Field(default_factory=list)
+    ai_comment: str = ""
+    provider: str = "none"
