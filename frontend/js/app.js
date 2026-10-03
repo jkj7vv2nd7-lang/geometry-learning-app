@@ -500,6 +500,36 @@
         cloadIn.value = '';
       });
     }
+    // 作図のPNG画像保存
+    var pngBtn = $('construct-png-btn');
+    if (pngBtn) pngBtn.addEventListener('click', function () {
+      var svg = $('geometry-canvas');
+      if (!svg) return;
+      var xml = new XMLSerializer().serializeToString(svg);
+      var url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var canvas = document.createElement('canvas');
+          canvas.width = 800; canvas.height = 500;
+          var ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, 800, 500);
+          ctx.drawImage(img, 0, 0, 800, 500);
+          var a = document.createElement('a');
+          a.download = 'construction-' + Date.now() + '.png';
+          a.href = canvas.toDataURL('image/png');
+          a.click();
+          addChatMessage('📷 作図をPNG画像で保存しました。記録帳やプリントに貼れます。', 'ai');
+        } catch (e) {
+          showError('画像の書き出しに失敗しました: ' + e.message);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      };
+      img.onerror = function () { showError('画像の書き出しに失敗しました'); URL.revokeObjectURL(url); };
+      img.src = url;
+    });
     // 変更のたびに計測表示＋自動保存（保存は間引きして軽量化）
     var saveTimer = null;
     CB.setOnChange(function () {
@@ -529,6 +559,35 @@
     // 定理レポート
     var dc = $('discover-btn');
     if (dc) dc.addEventListener('click', handleDiscoverTheorems);
+    // キーボードショートカット（入力欄 focus 中は無効）
+    document.addEventListener('keydown', function (e) {
+      var tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (!CB.undo()) addChatMessage('↩ もどれる手順はもうありません。', 'ai');
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z')))) {
+        e.preventDefault();
+        if (!CB.redo()) addChatMessage('↪ やりなおせる手順はありません。', 'ai');
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var map = {
+        v: 'select', p: 'point', s: 'segment', l: 'line', c: 'circle',
+        t: 'perp', r: 'parallel', e: 'pbis', g: 'tangent',
+        b: 'bisector', a: 'angle', d: 'delete'
+      };
+      var tool = map[(e.key || '').toLowerCase()];
+      if (tool) {
+        var btn = document.querySelector('[data-construct-tool="' + tool + '"]');
+        if (btn) btn.click();
+      } else if (e.key === 'Escape') {
+        var sel = document.querySelector('[data-construct-tool="select"]');
+        if (sel) sel.click();
+      }
+    });
     // 記録帳
     initJournal();
   }

@@ -604,6 +604,7 @@
   }
   function restoreFullState(s) {
     if (!s) return;
+    if (!s.data && s.points) { load(s); return; } // 旧形式（履歴なし保存）の移行
     load(s.data || null);
     if (s.history && s.history.length) { history = s.history; hIndex = Math.min(s.hIndex || 0, history.length - 1); }
     if (s.nameSeq) nameSeq = s.nameSeq;
@@ -620,7 +621,8 @@
     // 2点を通る直線と描画領域境界の交点
     var A = points[a], B = points[b];
     var dx = B.x - A.x, dy = B.y - A.y;
-    var len = Math.hypot(dx, dy) || 1;
+    var len = Math.hypot(dx, dy);
+    if (len < 1e-6) return { x1: A.x, y1: A.y, x2: A.x, y2: A.y }; // ドラッグで重なった場合
     dx /= len; dy /= len;
     var ts = [];
     if (dx !== 0) { ts.push((0 - A.x) / dx); ts.push((W - A.x) / dx); }
@@ -982,6 +984,7 @@
       if (traceOn) {
         activeTrace = { pts: [[pos.x, pos.y]], color: traceColors[traces.length % traceColors.length] };
         traces.push(activeTrace);
+        while (traces.length > 20) traces.shift(); // 保存容量に配慮して直近20本まで
       }
       try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       e.preventDefault();

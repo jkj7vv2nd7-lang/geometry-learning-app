@@ -185,6 +185,7 @@
               <button id="construct-save-btn" type="button" class="tool-btn" title="作図をJSONファイルに保存">💾 作図保存</button>
               <button id="construct-load-btn" type="button" class="tool-btn" title="保存した作図JSONを読み込む">📂 作図読込</button>
               <input id="construct-load-input" type="file" accept="application/json,.json" class="hidden" />
+              <button id="construct-png-btn" type="button" class="tool-btn" title="作図をPNG画像で保存">📷 画像保存</button>
               <button id="verify-construction-btn" type="button" class="tool-btn verify-btn" title="作図をAIに検証してもらう">🔍 AI検証</button>
               <button id="discover-btn" type="button" class="tool-btn verify-btn" title="作図から定理を自動発見する">📜 定理レポート</button>
             </div>
@@ -211,7 +212,7 @@
               📏 辺AB: — ｜ 辺BC: — ｜ ∠B: — ｜ 面積: —
             </div>
           </div>
-          <p class="text-xs text-slate-500 px-4 py-2">💡 ヒント：ツールバーの「● 点」「📏 線分」「⭕ 円」で<strong>自分で作図</strong>できるよ！点をドラッグして動かし、定理が成り立つか確かめたら「🔍 AI検証」を押してみよう。AI生成図の頂点（●）ドラッグも可能です。</p>
+          <p class="text-xs text-slate-500 px-4 py-2">💡 ヒント：ツールバーの「● 点」「📏 線分」「⭕ 円」で<strong>自分で作図</strong>できるよ！キーボードも使えます（V選択・P点・S線分・L直線・C円・T垂線・R平行・E中点垂線・G接線・B二等分・A角度・D削除・Esc選択・Ctrl+Z/Y）。作図は「📷 画像保存」でPNG化できます。</p>
           <!-- 関数グラフ入力バー -->
           <div id="function-bar" class="px-3 py-2 border-t bg-slate-50 flex flex-col gap-2">
             <div class="flex flex-wrap gap-2 items-center">

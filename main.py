@@ -115,32 +115,6 @@ def build_lesson_plan(prompt: str, grade: str, geom: dict) -> str:
     return ai_agent.generate_educational_content(prompt, grade, "teacher", geom).lesson_plan
 
 
-def build_worksheet(prompt: str, geom: dict) -> Worksheet:
-    m = geom.get("measurements", {}) or {}
-    sides = m.get("sides", {}) or {}
-    angles = m.get("angles_deg", {}) or {}
-    ab = sides.get("AB", "―")
-    angle_b = angles.get("B", "―")
-    area = m.get("area", "―")
-    q = (
-        "### 問1（知識・技能）\n図の三角形ABCについて、辺ABの長さを求めなさい。\n\n"
-        "### 問2（思考・判断・表現）\n頂点Cを動かすと内接円の半径はどう変わるか、理由とともに説明しなさい。\n\n"
-        "### 問3（活用）\n三平方の定理が成り立つ場合、どの2辺の関係になるか答えなさい。"
-    )
-    a = (
-        f"### 解答\n- 問1: 辺AB = {ab}\n- 問2: （例）Cを遠ざけると面積が増え、半径も大きくなる。r=2Δ/(a+b+c)より。\n"
-        f"- 問3: ∠B={angle_b}°のとき AB²＋BC²＝CA²（面積 {area} を手がかりに確かめられる）。"
-    )
-    r = (
-        "### 評価基準（3観点ループリック）\n"
-        "| 観点 | A（十分満足） | B（おおむね満足） | C（要支援） |\n|---|---|---|---|\n"
-        "| 知識・技能 | 計測値を正確に読み取れる | 概ね読み取れる | 読み取りに支援が必要 |\n"
-        "| 思考・判断・表現 | 根拠（数値）と結論を結びつけて説明できる | 根拠に触れて説明できる | 説明に支援が必要 |\n"
-        "| 主体的態度 | 自ら問いを立て探求する | 促されれば探求する | 促しても取り組めない |"
-    )
-    return Worksheet(questions=q, answers=a, rubric=r)
-
-
 # ---------------- API ----------------
 
 @app.get("/api/health")
