@@ -1053,6 +1053,35 @@ CONSTRUCTION_COMMENT_SYSTEM = (
     "数値の捏造は禁止です。200字以内・Markdown形式・優しい言葉づかいで。"
 )
 
+DISCOVER_REPORT_SYSTEM = (
+    "あなたは小中高生の探求を応援する算数・数学の先生です。"
+    "【定理の自動発見結果】（正確な計算機の出力）を読みやすくまとめ、"
+    "「なぜ成り立つのか」を考える問いかけを1つ添えてください。"
+    "数値の捏造は禁止です。Markdown形式・優しい言葉づかいで。"
+    "出力は '## 📜 定理発見レポート' から始めてください。"
+)
+
+
+def theorem_report(
+    discoveries_text: str, grade: str = "elementary-high"
+) -> Tuple[str, AIProvider]:
+    """定理レポート生成の共通エントリーポイント（プロバイダ非依存）。"""
+    text, used = _generate_text_auto(
+        DISCOVER_REPORT_SYSTEM, f"学年: {grade}\n【定理の自動発見結果】\n{discoveries_text}")
+    if text:
+        return text, used
+    body = "\n\n".join(f"### {i + 1}. {line}" for i, line in enumerate(discoveries_text.split("\n")) if line.strip())
+    if get_active_provider() == "none":
+        return (
+            f"⚠️ {NO_API_KEY_WARNING}\n\n## 📜 定理発見レポート\n\n{body}\n\n"
+            "点をドラッグしても成り立ち続けるか、実験して確かめてみよう。",
+            "none",
+        )
+    return (
+        f"## 📜 定理発見レポート\n\n{body}\n\n点をドラッグしても成り立ち続けるか、実験して確かめてみよう。",
+        used,
+    )
+
 
 def comment_on_construction(
     checks_text: str, query: str = "", grade: str = "elementary-high"

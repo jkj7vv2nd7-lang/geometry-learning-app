@@ -10,7 +10,10 @@
   var ENDPOINT_GENERATE = API_BASE + '/api/generate-geometry';
   var ENDPOINT_CHAT = API_BASE + '/api/chat';
   var ENDPOINT_VERIFY = API_BASE + '/api/verify-construction';
+  var ENDPOINT_DISCOVER = API_BASE + '/api/discover-theorems';
   var CONSTRUCT_STORE_KEY = 'construction-v1';
+  var JOURNAL_STORE_KEY = 'journal-v1';
+  var lastVerify = null; // 記録帳用：最新のAI検証結果
 
   // ---------- ヘルパー ----------
   function $(id) { return document.getElementById(id); }
@@ -444,6 +447,22 @@
       snapBtn.textContent = CB.isSnap() ? '🧲 吸着ON' : '🧲 吸着OFF';
       snapBtn.setAttribute('aria-pressed', String(CB.isSnap()));
     });
+    // 軌跡トグル
+    var traceBtn = $('toggle-trace-btn');
+    if (traceBtn) traceBtn.addEventListener('click', function () {
+      CB.setTrace(!CB.isTrace());
+      traceBtn.textContent = CB.isTrace() ? '✨ 軌跡ON' : '✨ 軌跡OFF';
+      traceBtn.setAttribute('aria-pressed', String(CB.isTrace()));
+      if (CB.isTrace()) addChatMessage('✨ 軌跡記録ON！👆 選択ツールで点をドラッグすると、その点の動きの軌跡が残ります。中点の軌跡などを観察してみよう。', 'ai');
+    });
+    // もどる・やりなおし
+    var undoBtn = $('construct-undo-btn'), redoBtn = $('construct-redo-btn');
+    if (undoBtn) undoBtn.addEventListener('click', function () {
+      if (!CB.undo()) addChatMessage('↩ もどれる手順はもうありません。', 'ai');
+    });
+    if (redoBtn) redoBtn.addEventListener('click', function () {
+      if (!CB.redo()) addChatMessage('↪ やりなおせる手順はありません。', 'ai');
+    });
     // 全消去
     var clr = $('clear-construct-btn');
     if (clr) clr.addEventListener('click', function () {
@@ -451,9 +470,9 @@
       CB.clear();
       try { localStorage.removeItem(CONSTRUCT_STORE_KEY); } catch (_) {}
     });
-    // 変更のたびに自動保存＋計測表示
-    CB.setOnChange(function (data) {
-      try { localStorage.setItem(CONSTRUCT_STORE_KEY, JSON.stringify(data)); } catch (_) {}
+    // 変更のたびに計測表示＋自動保存（保存は間引きして軽量化）
+    var saveTimer = null;
+    CB.setOnChange(function () {
       var st = CB.stats();
       if (!window.GeometryRenderer.getCurrentData()) {
         var box = $('measurement-display');
@@ -462,16 +481,26 @@
             '・円' + st.circles + '・角度' + st.angles;
         }
       }
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(function () {
+        try { localStorage.setItem(CONSTRUCT_STORE_KEY, JSON.stringify(CB.getFullState())); } catch (_) {}
+      }, 400);
     });
-    // 前回の作図を復元
+    // 前回の作図・履歴を復元（なければ「開始」で初期化）
     try {
       var saved = localStorage.getItem(CONSTRUCT_STORE_KEY);
-      if (saved) CB.load(JSON.parse(saved));
-    } catch (_) {}
+      if (saved) CB.restoreFullState(JSON.parse(saved));
+      else CB.load(null);
+    } catch (_) { try { CB.load(null); } catch (_) {} }
 
     // AI検証
     var vf = $('verify-construction-btn');
     if (vf) vf.addEventListener('click', handleVerifyConstruction);
+    // 定理レポート
+    var dc = $('discover-btn');
+    if (dc) dc.addEventListener('click', handleDiscoverTheorems);
+    // 記録帳
+    initJournal();
   }
 
   async function handleVerifyConstruction() {
@@ -501,11 +530,98 @@
       }).join('\n\n') + '\n\n---\n\n' + out.ai_comment;
       addChatMessage(md, 'ai');
       setStatus('検証完了', true);
+      lastVerify = { time: new Date().toLocaleString('ja-JP'), checks: out.checks, comment: out.ai_comment };
     } catch (err) {
       showError('作図検証に失敗しました: ' + err.message);
     } finally {
       hideLoading();
     }
+  }
+
+  async function handleDiscoverTheorems() {
+    var CB = window.ConstructionBoard;
+    if (!CB) return;
+    var data = CB.serialize();
+    if (Object.keys(data.points).length < 3) {
+      addChatMessage('📜 点を3つ以上打って何か作図してから「📜 定理レポート」を押してみよう。三角形や円があると定理が見つかるよ！', 'ai');
+      return;
+    }
+    showLoading('定理を探しています...');
+    try {
+      var res = await fetch(ENDPOINT_DISCOVER, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          construction: data,
+          grade: $('grade-select') ? $('grade-select').value : 'elementary-high'
+        })
+      });
+      if (!res.ok) throw new Error('status ' + res.status);
+      var out = await res.json();
+      addChatMessage(out.report_md, 'ai');
+      setStatus('定理レポート完了', true);
+    } catch (err) {
+      showError('定理レポートの生成に失敗しました: ' + err.message);
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // ---------- 探求の記録帳（予想→検証） ----------
+  function loadJournal() {
+    try { return JSON.parse(localStorage.getItem(JOURNAL_STORE_KEY) || '[]'); }
+    catch (_) { return []; }
+  }
+  function renderJournal() {
+    var box = $('journal-entries');
+    if (!box) return;
+    var entries = loadJournal();
+    box.innerHTML = '';
+    if (!entries.length) {
+      box.innerHTML = '<p class="text-xs text-slate-400">まだ記録がありません。予想→AI検証→記録の順に使ってみよう。</p>';
+      return;
+    }
+    entries.slice().reverse().forEach(function (en, ri) {
+      var idx = entries.length - 1 - ri;
+      var div = document.createElement('div');
+      div.className = 'journal-entry';
+      var okCount = en.checks.filter(function (c) { return c.passed; }).length;
+      div.innerHTML = '<h4>📝 ' + esc(en.time) + '（検証 ' + okCount + '/' + en.checks.length + '）</h4>' +
+        '<p><strong>予想：</strong>' + esc(en.prediction) + '</p>' +
+        '<p class="text-xs">' + en.checks.map(function (c) {
+          return (c.passed ? '✅' : '⬜') + esc(c.name);
+        }).join('・') + '</p>';
+      var del = document.createElement('button');
+      del.type = 'button'; del.className = 'tool-btn'; del.style.minHeight = '32px';
+      del.textContent = '削除';
+      (function (i) {
+        del.addEventListener('click', function () {
+          var arr = loadJournal();
+          arr.splice(i, 1);
+          try { localStorage.setItem(JOURNAL_STORE_KEY, JSON.stringify(arr)); } catch (_) {}
+          renderJournal();
+        });
+      })(idx);
+      div.appendChild(del);
+      box.appendChild(div);
+    });
+  }
+  function initJournal() {
+    renderJournal();
+    var btn = $('journal-save-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var inp = $('journal-prediction-input');
+      var pred = inp ? inp.value.trim() : '';
+      if (!pred) { addChatMessage('📓 まず予想を入力してね（例：この三角形は直角のはず）。', 'ai'); if (inp) inp.focus(); return; }
+      if (!lastVerify) { addChatMessage('📓 「🔍 AI検証」を押してから記録してね。予想と検証結果がセットで残ります。', 'ai'); return; }
+      var arr = loadJournal();
+      arr.push({ time: new Date().toLocaleString('ja-JP'), prediction: pred, checks: lastVerify.checks, comment: lastVerify.comment });
+      try { localStorage.setItem(JOURNAL_STORE_KEY, JSON.stringify(arr)); } catch (_) {}
+      if (inp) inp.value = '';
+      renderJournal();
+      addChatMessage('📓 記録帳に保存しました！予想と検証を見比べて、次の予想を立ててみよう。', 'ai');
+    });
   }
 
   function initMisc() {

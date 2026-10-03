@@ -164,10 +164,16 @@
               <button id="tool-circle" type="button" data-construct-tool="circle" class="construct-tool" title="中心と円周上の点で円">⭕ 円</button>
               <button id="tool-perp" type="button" data-construct-tool="perp" class="construct-tool" title="線分を選んで点を選ぶと垂線">⊥ 垂線</button>
               <button id="tool-angle" type="button" data-construct-tool="angle" class="construct-tool" title="頂点→点→点の順に3点で角度">📐 角度</button>
+              <button id="tool-bisector" type="button" data-construct-tool="bisector" class="construct-tool" title="頂点→点→点の順に3点で二等分線">∠ 二等分線</button>
+              <button id="tool-parallel" type="button" data-construct-tool="parallel" class="construct-tool" title="線分を選んで点を選ぶと平行線">⇉ 平行線</button>
               <button id="tool-delete" type="button" data-construct-tool="delete" class="construct-tool" title="図形をタップで削除">🗑 削除</button>
               <button id="toggle-snap-btn" type="button" class="tool-btn" aria-pressed="true" title="方眼に吸着">🧲 吸着ON</button>
+              <button id="toggle-trace-btn" type="button" class="tool-btn" aria-pressed="false" title="ドラッグした点の軌跡を記録">✨ 軌跡OFF</button>
+              <button id="construct-undo-btn" type="button" class="tool-btn" title="1手もどる">↩ もどる</button>
+              <button id="construct-redo-btn" type="button" class="tool-btn" title="1手すすむ">↪ やりなおし</button>
               <button id="clear-construct-btn" type="button" class="tool-btn" title="作図を全消去">🧹 全消去</button>
               <button id="verify-construction-btn" type="button" class="tool-btn verify-btn" title="作図をAIに検証してもらう">🔍 AI検証</button>
+              <button id="discover-btn" type="button" class="tool-btn verify-btn" title="作図から定理を自動発見する">📜 定理レポート</button>
             </div>
             <!-- 将来：GeoGebra風ドラッグ操作はこのSVG上の点・線要素 (.draggable-point / .draggable-line) にバインド -->
             <svg id="geometry-canvas" viewBox="0 0 800 500" class="w-full h-auto block touch-none select-none" role="img" aria-label="生成された図形">
@@ -193,6 +199,15 @@
           <p class="text-xs text-slate-500 px-4 py-2">💡 ヒント：ツールバーの「● 点」「📏 線分」「⭕ 円」で<strong>自分で作図</strong>できるよ！点をドラッグして動かし、定理が成り立つか確かめたら「🔍 AI検証」を押してみよう。AI生成図の頂点（●）ドラッグも可能です。</p>
         </section>
 
+        <!-- 作図の履歴 -->
+        <section id="history-section" aria-labelledby="history-heading" class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b">
+            <h2 id="history-heading" class="font-extrabold text-sm">🕰 作図の履歴（タップで巻き戻し）</h2>
+            <span id="history-count" class="text-xs text-slate-500"></span>
+          </div>
+          <ol id="construct-history" class="p-2 space-y-1 max-h-[140px] overflow-y-auto text-sm" aria-live="polite"></ol>
+        </section>
+
         <!-- チャット・解説エリア -->
         <section id="chat-section" aria-labelledby="chat-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
           <h2 id="chat-heading" class="font-extrabold px-4 py-3 border-b">💬 AI先生の解説・問いかけ</h2>
@@ -204,6 +219,20 @@
           <div id="chat-input-row" class="flex gap-2 p-3 border-t">
             <input id="chat-input" type="text" placeholder="わからないこと・試したいことを聞いてみよう（例：なぜ内接円の中心はそこにあるの？）" class="flex-1 border rounded-xl px-3 py-3 text-sm min-h-[44px] focus:ring-2 focus:outline-none" />
             <button id="chat-send-btn" type="button" class="px-5 rounded-xl font-bold min-h-[44px]">送信</button>
+          </div>
+        </section>
+
+        <!-- 探求の記録帳（予想→検証） -->
+        <section id="journal-section" aria-labelledby="journal-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
+          <h2 id="journal-heading" class="font-extrabold px-4 py-3 border-b">📓 探求の記録帳（予想 → 検証）</h2>
+          <div class="p-3 flex flex-col gap-2">
+            <label for="journal-prediction-input" class="text-sm font-bold">① 予想を書こう（例：直角三角形なら三平方の定理が成り立つはず）</label>
+            <div class="flex gap-2">
+              <input id="journal-prediction-input" type="text" placeholder="予想を入力…" class="flex-1 border rounded-xl px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:outline-none" />
+              <button id="journal-save-btn" type="button" class="tool-btn" title="最新のAI検証結果と合わせて記録">📌 記録する</button>
+            </div>
+            <p class="text-xs text-slate-500">②「🔍 AI検証」を押した後に「📌 記録する」を押すと、予想と検証結果がセットで残ります。</p>
+            <div id="journal-entries" class="space-y-2 max-h-[260px] overflow-y-auto" aria-live="polite"></div>
           </div>
         </section>
       </div>

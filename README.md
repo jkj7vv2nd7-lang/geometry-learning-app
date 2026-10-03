@@ -17,7 +17,8 @@
 | 📂 マルチモーダルOCR解析 | 教科書PDF・ノート写真（JPEG/PNG）・参考URLから単元名・図形種別・数値を抽出（`backend/ai_agent.py`） |
 | 🔀 AI自動切り替え | 環境変数のキー有無で OpenAI（gpt-4o）⇔ Gemini（gemini-1.5-pro/flash）を自動選択。キー無しでも図形計算のみで動作継続 |
 | 📐 正確な幾何計算 | 三角形・内接円・外接円・正多角形・三平方の定理の証明図などを純粋数学で算出（`backend/geometry_solver.py`） |
-| ✏️ 作図・探求キャンバス | 点・線分・直線・円・垂線・角度ツールで自分で作図し、ドラッグ変形＋自動保存＋AI検証（`🔍 AI検証`ボタン） |
+| ✏️ 作図・探求キャンバス | 点・線分・直線・円・垂線・平行線・二等分線・角度ツールで自分で作図し、ドラッグ変形＋軌跡記録＋履歴巻き戻し＋自動保存＋AI検証・定理レポート |
+| 📓 探求の記録帳 | 予想→AI検証→記録のサイクルを保存・振り返り |
 | 🔁 ドラッグ再計算API | フロントで頂点を動かした際の再計算用 `POST /api/recalculate` を用意 |
 
 ## ディレクトリ構造
@@ -88,6 +89,7 @@ uvicorn main:app --reload --port 8000
 | POST | `/api/generate-geometry` | 図形生成（Form: `prompt`, `grade`, `mode`, `source_urls`, `files`） |
 | POST | `/api/recalculate` | 頂点ドラッグ後の再計算（JSON: `points`） |
 | POST | `/api/verify-construction` | 作図の検証（直角・三平方・平行等の判定＋AIコメント） |
+| POST | `/api/discover-theorems` | 定理の自動発見レポート（三平方・タレス・正三角形等＋AI解説） |
 | POST | `/api/chat` | 解説チャット（JSON: `message`, `grade`, `mode`） |
 
 ## 動作環境

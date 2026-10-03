@@ -122,6 +122,8 @@ class ConstructionData(BaseModel):
     circles: List[List[str]] = Field(default_factory=list, description="円 [中心名, 円周点名]")
     perps: List[Dict[str, object]] = Field(default_factory=list)
     angles: List[List[str]] = Field(default_factory=list, description="角度 [頂点, 点A, 点B]")
+    bisectors: List[List[str]] = Field(default_factory=list, description="二等分線 [頂点, 点A, 点B]")
+    parallels: List[Dict[str, object]] = Field(default_factory=list)
 
 
 class VerifyRequest(BaseModel):
@@ -139,4 +141,20 @@ class ConstructionCheck(BaseModel):
 class VerifyResponse(BaseModel):
     checks: List[ConstructionCheck] = Field(default_factory=list)
     ai_comment: str = ""
+    provider: str = "none"
+
+
+class DiscoverRequest(BaseModel):
+    construction: ConstructionData
+    grade: str = "elementary-high"
+
+
+class Discovery(BaseModel):
+    theorem: str
+    statement: str
+
+
+class DiscoverResponse(BaseModel):
+    discoveries: List[Discovery] = Field(default_factory=list)
+    report_md: str = ""
     provider: str = "none"

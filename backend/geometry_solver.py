@@ -303,6 +303,102 @@ def recalculate(points: Dict[str, Dict[str, float]], with_incircle: bool = True)
 
 
 # ---------------- 作図検証（学習者用・/api/verify-construction 用） ----------------
+# ---------------- 定理の自動発見（/api/discover-theorems 用） ----------------
+
+def discover_theorems(data: Dict) -> List[Dict]:
+    """作図から定理候補を自動発見する。[{theorem, statement}] を返す。
+
+    対象：三角形の分類・三平方の定理・タレスの定理（半円の角）・平行/垂直・等長。
+    """
+    out: List[Dict] = []
+    pts = data.get("points", {}) or {}
+    segs = [(s[0], s[1]) for s in (data.get("segments", []) or []) if s[0] in pts and s[1] in pts]
+    adj: Dict[str, set] = {n: set() for n in pts}
+    for a, b in segs:
+        adj[a].add(b)
+        adj[b].add(a)
+    names = list(pts.keys())
+
+    def seg3(p: str, q: str, r: str) -> List[float]:
+        return sorted([_seg_len(pts, p, q), _seg_len(pts, q, r), _seg_len(pts, r, p)])
+
+    # 線分で結ばれた三点組＝三角形として調べる
+    tris = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            for k in range(j + 1, len(names)):
+                a, b, c = names[i], names[j], names[k]
+                if b in adj[a] and c in adj[b] and a in adj[c]:
+                    tris.append((a, b, c))
+    for a, b, c in tris:
+        angs = {
+            a: _angle_at_vertex(pts[a]["x"], pts[a]["y"], pts[b]["x"], pts[b]["y"], pts[c]["x"], pts[c]["y"]),
+            b: _angle_at_vertex(pts[b]["x"], pts[b]["y"], pts[a]["x"], pts[a]["y"], pts[c]["x"], pts[c]["y"]),
+            c: _angle_at_vertex(pts[c]["x"], pts[c]["y"], pts[a]["x"], pts[a]["y"], pts[b]["x"], pts[b]["y"]),
+        }
+        right = [v for v, d in angs.items() if abs(d - 90.0) <= 2.0]
+        s = seg3(a, b, c)
+        if right:
+            v = right[0]
+            others = [p for p in (a, b, c) if p != v]
+            hyp = _seg_len(pts, others[0], others[1])
+            legs = sorted([_seg_len(pts, v, others[0]), _seg_len(pts, v, others[1])])
+            if hyp > 0 and abs(legs[0] ** 2 + legs[1] ** 2 - hyp ** 2) / (hyp ** 2) <= 0.03:
+                out.append({"theorem": "三平方の定理",
+                            "statement": f"△{a}{b}{c}は∠{v}＝{angs[v]:.1f}°の直角三角形で、"
+                                         f"{legs[0]:.0f}²＋{legs[1]:.0f}²≒{hyp:.0f}²が成り立ちます。"})
+            else:
+                out.append({"theorem": "直角三角形",
+                            "statement": f"△{a}{b}{c}は∠{v}＝{angs[v]:.1f}°の直角三角形です。"})
+        if abs(s[0] - s[1]) <= max(3.0, s[0] * 0.02) and abs(s[1] - s[2]) <= max(3.0, s[1] * 0.02):
+            out.append({"theorem": "正三角形",
+                        "statement": f"△{a}{b}{c}は3辺が約{s[0]:.0f}で等しく、3つの角は約60°の正三角形です。"})
+        elif (abs(s[0] - s[1]) <= max(3.0, s[0] * 0.02) or abs(s[1] - s[2]) <= max(3.0, s[1] * 0.02)):
+            out.append({"theorem": "二等辺三角形",
+                        "statement": f"△{a}{b}{c}に等しい2辺があり、底角が等しくなります。"})
+    # タレスの定理：円の直径を一辺とし円周上に頂点を持つ三角形は直角
+    for circ in (data.get("circles", []) or []):
+        cc, pp = circ[0], circ[1]
+        if cc not in pts or pp not in pts:
+            continue
+        r = _seg_len(pts, cc, pp)
+        rim = [n for n in names if n != cc and abs(_seg_len(pts, cc, n) - r) <= max(4.0, r * 0.03)]
+        for i in range(len(rim)):
+            for j in range(i + 1, len(rim)):
+                x, y = rim[i], rim[j]
+                mx = (pts[x]["x"] + pts[y]["x"]) / 2.0
+                my = (pts[x]["y"] + pts[y]["y"]) / 2.0
+                if math.hypot(mx - pts[cc]["x"], my - pts[cc]["y"]) > max(4.0, r * 0.03):
+                    continue  # 中心が中点でない＝直径でない
+                for z in rim:
+                    if z == x or z == y:
+                        continue
+                    if math.hypot(pts[z]["x"] - pts[x]["x"], pts[z]["y"] - pts[x]["y"]) < 1e-6:
+                        continue
+                    if math.hypot(pts[z]["x"] - pts[y]["x"], pts[z]["y"] - pts[y]["y"]) < 1e-6:
+                        continue
+                    deg = _angle_at_vertex(
+                        pts[z]["x"], pts[z]["y"], pts[x]["x"], pts[x]["y"], pts[y]["x"], pts[y]["y"])
+                    if abs(deg - 90.0) <= 2.5:
+                        out.append({"theorem": "タレスの定理（半円の角）",
+                                    "statement": f"線分{x}{y}は中心{cc}を通る直径で、"
+                                                 f"円周上の点{z}から見た角{x}{z}{y}は{deg:.1f}°≒90°です。"})
+                        break
+                else:
+                    continue
+                break
+    # 二等分線の検証：申告角の二等分になっているか
+    for item in (data.get("bisectors", []) or []):
+        v, a, b = item[0], item[1], item[2]
+        if v in pts and a in pts and b in pts:
+            deg = _angle_at_vertex(
+                pts[v]["x"], pts[v]["y"], pts[a]["x"], pts[a]["y"], pts[b]["x"], pts[b]["y"])
+            out.append({"theorem": "角の二等分線",
+                        "statement": f"∠{a}{v}{b}＝{deg:.1f}°を二等分し、それぞれ約{deg / 2:.1f}°になります。"})
+    if not out:
+        out.append({"theorem": "（発見なし）",
+                    "statement": "定理らしい形はまだ見つかりません。三角形を作るか、円に点を打ってみましょう。"})
+    return out
 # LLM不使用。作図データの幾何学的性質を決定論的に判定する。
 
 def _seg_len(pts: Dict[str, Dict[str, float]], a: str, b: str) -> float:

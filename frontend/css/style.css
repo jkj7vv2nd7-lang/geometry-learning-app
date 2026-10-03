@@ -46,6 +46,51 @@
   cursor: grabbing;
 }
 
+/* ============================================================
+ * 10. 履歴・記録帳
+ * ============================================================ */
+#construct-history {
+  list-style: none;
+  scrollbar-width: thin;
+}
+.construct-history-item {
+  width: 100%;
+  text-align: left;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 0.6rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  font-size: 13px;
+}
+.construct-history-item:hover {
+  border-color: #f59e00;
+  background: #fffbeb;
+}
+.construct-history-current {
+  background: #f59e00 !important;
+  color: #fff !important;
+  border-color: #b45309 !important;
+  font-weight: 800;
+}
+.construct-history-future {
+  opacity: 0.55;
+}
+.journal-entry {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  padding: 10px 12px;
+  background: #fffbeb;
+  font-size: 13.5px;
+  line-height: 1.8;
+}
+.journal-entry h4 {
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
 :root {
   /* 児童・生徒モード（青・水色ベース） */
   --student-primary: #2563eb;

@@ -27,6 +27,9 @@ from backend.schemas import (
     ChatRequest,
     ChatResponse,
     ConstructionCheck,
+    DiscoverRequest,
+    DiscoverResponse,
+    Discovery,
     GeometryData,
     GeometryResponse,
     Measurements,
@@ -230,6 +233,23 @@ async def verify_construction(req: VerifyRequest) -> VerifyResponse:
     )
     comment, provider = ai_agent.comment_on_construction(summary, req.query, req.grade)
     return VerifyResponse(checks=checks, ai_comment=comment, provider=provider)
+
+
+@app.post("/api/discover-theorems", response_model=DiscoverResponse)
+async def discover_theorems(req: DiscoverRequest) -> DiscoverResponse:
+    """作図から定理を自動発見し、レポートを返す。"""
+    c = req.construction
+    data = {
+        "points": {k: {"x": v.x, "y": v.y} for k, v in c.points.items()},
+        "segments": [list(s) for s in c.segments],
+        "circles": [list(s) for s in c.circles],
+        "bisectors": [list(b) for b in c.bisectors],
+    }
+    raw = solver.discover_theorems(data)
+    discoveries = [Discovery(**d) for d in raw]
+    summary = "\n".join(f"- {d.theorem}: {d.statement}" for d in discoveries)
+    report, provider = ai_agent.theorem_report(summary, req.grade)
+    return DiscoverResponse(discoveries=discoveries, report_md=report, provider=provider)
 
 
 # ---------------- 静的配信（frontend/index.html等） ----------------

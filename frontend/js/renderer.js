@@ -413,10 +413,18 @@
   var circles = [];      // {c, p} 中心と円周上の点
   var perps = [];        // {a, b, p} 線分ABに対する点Pを通る垂線
   var angles = [];       // {v, a, b} 頂点Vの角AVB
+  var bisectors = [];    // {v, a, b} 角AVBの二等分線（半直線）
+  var parallels = [];    // {a, b, p} 線分ABに平行で点Pを通る直線
+  var traces = [];       // {pts: [[x,y]...], color} 軌跡記録
+  var traceOn = false;
+  var activeTrace = null;
   var nameSeq = 0;
   var pending = [];      // クリック収集中（2点・3点ツール用）
-  var pendingSeg = -1;   // 垂線ツール：選択中の線分index
+  var pendingSeg = -1;   // 垂線・平行線ツール：選択中の線分index
   var onChange = null;
+  // 履歴（巻き戻し用スナップショット）
+  var history = [];
+  var hIndex = -1;
 
   function el(name, attrs, parent) {
     var node = document.createElementNS(SVG_NS, name);
@@ -479,6 +487,110 @@
     circles = circles.filter(function (c) { return c.c !== n && c.p !== n; });
     perps = perps.filter(function (p) { return p.a !== n && p.b !== n && p.p !== n; });
     angles = angles.filter(function (a) { return a.v !== n && a.a !== n && a.b !== n; });
+    bisectors = bisectors.filter(function (b) { return b.v !== n && b.a !== n && b.b !== n; });
+    parallels = parallels.filter(function (p) { return p.a !== n && p.b !== n && p.p !== n; });
+  }
+
+  // ---------- 履歴（作図手順の巻き戻し） ----------
+  function snapshotData() {
+    var pts = {};
+    Object.keys(points).forEach(function (n) { pts[n] = { x: points[n].x, y: points[n].y }; });
+    return {
+      points: pts,
+      segments: segments.map(function (s) { return [s.a, s.b]; }),
+      lines: lines.map(function (s) { return [s.a, s.b]; }),
+      circles: circles.map(function (c) { return [c.c, c.p]; }),
+      perps: perps.map(function (p) { return { seg: [p.a, p.b], p: p.p }; }),
+      angles: angles.map(function (a) { return [a.v, a.a, a.b]; }),
+      bisectors: bisectors.map(function (b) { return [b.v, b.a, b.b]; }),
+      parallels: parallels.map(function (p) { return { seg: [p.a, p.b], p: p.p }; })
+    };
+  }
+  function applySnapshot(d) {
+    points = {}; segments = []; lines = []; circles = []; perps = []; angles = [];
+    bisectors = []; parallels = [];
+    pending = []; pendingSeg = -1;
+    Object.keys(d.points || {}).forEach(function (n) {
+      points[n] = { x: +d.points[n].x || 0, y: +d.points[n].y || 0 };
+    });
+    (d.segments || []).forEach(function (s) { if (points[s[0]] && points[s[1]]) segments.push({ a: s[0], b: s[1] }); });
+    (d.lines || []).forEach(function (s) { if (points[s[0]] && points[s[1]]) lines.push({ a: s[0], b: s[1] }); });
+    (d.circles || []).forEach(function (c) { if (points[c[0]] && points[c[1]]) circles.push({ c: c[0], p: c[1] }); });
+    (d.perps || []).forEach(function (p) {
+      if (points[p.seg[0]] && points[p.seg[1]] && points[p.p]) perps.push({ a: p.seg[0], b: p.seg[1], p: p.p });
+    });
+    (d.angles || []).forEach(function (a) {
+      if (points[a[0]] && points[a[1]] && points[a[2]]) angles.push({ v: a[0], a: a[1], b: a[2] });
+    });
+    (d.bisectors || []).forEach(function (b) {
+      if (points[b[0]] && points[b[1]] && points[b[2]]) bisectors.push({ v: b[0], a: b[1], b: b[2] });
+    });
+    (d.parallels || []).forEach(function (p) {
+      if (points[p.seg[0]] && points[p.seg[1]] && points[p.p]) parallels.push({ a: p.seg[0], b: p.seg[1], p: p.p });
+    });
+  }
+  function commit(label) {
+    history = history.slice(0, hIndex + 1);
+    history.push({ label: label, data: snapshotData() });
+    if (history.length > 100) history.shift();
+    hIndex = history.length - 1;
+    renderHistory();
+  }
+  function undo() {
+    if (hIndex <= 0) return false;
+    hIndex--;
+    applySnapshot(history[hIndex].data);
+    render();
+    renderHistory();
+    return true;
+  }
+  function redo() {
+    if (hIndex >= history.length - 1) return false;
+    hIndex++;
+    applySnapshot(history[hIndex].data);
+    render();
+    renderHistory();
+    return true;
+  }
+  function jumpTo(i) {
+    if (i < 0 || i >= history.length) return false;
+    hIndex = i;
+    applySnapshot(history[hIndex].data);
+    render();
+    renderHistory();
+    return true;
+  }
+  function renderHistory() {
+    var ol = document.getElementById('construct-history');
+    var cnt = document.getElementById('history-count');
+    if (cnt) cnt.textContent = history.length ? (hIndex + 1) + ' / ' + history.length + '手' : '';
+    if (!ol) return;
+    while (ol.firstChild) ol.removeChild(ol.firstChild);
+    history.forEach(function (h, i) {
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'construct-history-item' +
+        (i === hIndex ? ' construct-history-current' : '') +
+        (i > hIndex ? ' construct-history-future' : '');
+      btn.textContent = (i + 1) + '. ' + h.label;
+      (function (idx) {
+        btn.addEventListener('click', function () { jumpTo(idx); });
+      })(i);
+      li.appendChild(btn);
+      ol.appendChild(li);
+    });
+    ol.scrollTop = ol.scrollHeight;
+  }
+  function getFullState() {
+    return { data: serialize({ traces: true }), history: history, hIndex: hIndex, nameSeq: nameSeq };
+  }
+  function restoreFullState(s) {
+    if (!s) return;
+    load(s.data || null);
+    if (s.history && s.history.length) { history = s.history; hIndex = Math.min(s.hIndex || 0, history.length - 1); }
+    if (s.nameSeq) nameSeq = s.nameSeq;
+    renderHistory();
   }
 
   // ---------- 描画 ----------
@@ -504,6 +616,27 @@
     pts.sort(function (p, q) { return p - q; });
     var t0 = pts[0], t1 = pts[pts.length - 1];
     return { x1: A.x + dx * t0, y1: A.y + dy * t0, x2: A.x + dx * t1, y2: A.y + dy * t1 };
+  }
+  function extEnds(x, y, dx, dy) {
+    // 点(x,y)を通り方向(dx,dy)の直線と領域境界の交点
+    var ts = [];
+    if (dx !== 0) { ts.push((0 - x) / dx); ts.push((W - x) / dx); }
+    if (dy !== 0) { ts.push((0 - y) / dy); ts.push((H - y) / dy); }
+    var ok = [];
+    ts.forEach(function (t) {
+      var px = x + dx * t, py = y + dy * t;
+      if (px >= -1 && px <= W + 1 && py >= -1 && py <= H + 1) ok.push(t);
+    });
+    ok.sort(function (p, q) { return p - q; });
+    if (!ok.length) return { x1: x, y1: y, x2: x, y2: y };
+    return { x1: x + dx * ok[0], y1: y + dy * ok[0], x2: x + dx * ok[ok.length - 1], y2: y + dy * ok[ok.length - 1] };
+  }
+  function rayEnds(x, y, dx, dy) {
+    // 点(x,y)を起点とする半直線の終点
+    var e = extEnds(x, y, dx, dy);
+    var d1 = (e.x1 - x) * dx + (e.y1 - y) * dy;
+    var d2 = (e.x2 - x) * dx + (e.y2 - y) * dy;
+    return d2 >= d1 ? { x2: e.x2, y2: e.y2 } : { x2: e.x1, y2: e.y1 };
   }
   function render() {
     var g = clearLayer('construct-layer');
@@ -548,6 +681,42 @@
       el('circle', { cx: O.x, cy: O.y, r: r, fill: 'none', stroke: '#0891b2', 'stroke-width': 2.5, opacity: 0.9 }, g);
       var t = el('text', { x: O.x + r * 0.7, y: O.y - r * 0.7, class: 'measure-label', fill: '#0891b2' }, m);
       t.textContent = 'r=' + r.toFixed(0);
+    });
+    // 平行線（点Pを通り線分ABに平行な直線）
+    parallels.forEach(function (P) {
+      if (!points[P.a] || !points[P.b] || !points[P.p]) return;
+      var A = points[P.a], B = points[P.b], Q = points[P.p];
+      var dx = B.x - A.x, dy = B.y - A.y;
+      var len = Math.hypot(dx, dy) || 1;
+      var e = extEnds(Q.x, Q.y, dx / len, dy / len);
+      el('line', {
+        x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2,
+        stroke: '#7c3aed', 'stroke-width': 2.5, 'stroke-dasharray': '12 5', opacity: 0.9
+      }, g);
+    });
+    // 角の二等分線（頂点Vからの半直線）
+    bisectors.forEach(function (B) {
+      if (!points[B.v] || !points[B.a] || !points[B.b]) return;
+      var V = points[B.v];
+      var u1x = points[B.a].x - V.x, u1y = points[B.a].y - V.y;
+      var u2x = points[B.b].x - V.x, u2y = points[B.b].y - V.y;
+      var l1 = Math.hypot(u1x, u1y) || 1, l2 = Math.hypot(u2x, u2y) || 1;
+      var dx = u1x / l1 + u2x / l2, dy = u1y / l1 + u2y / l2;
+      var dl = Math.hypot(dx, dy);
+      if (dl < 1e-6) return; // 180°では定義できない
+      var e = rayEnds(V.x, V.y, dx / dl, dy / dl);
+      el('line', {
+        x1: V.x, y1: V.y, x2: e.x2, y2: e.y2,
+        stroke: '#db2777', 'stroke-width': 2.5, opacity: 0.9
+      }, g);
+    });
+    // 軌跡（ドラッグ記録の折れ線）
+    traces.forEach(function (T) {
+      if (!T.pts || T.pts.length < 2) return;
+      el('polyline', {
+        points: T.pts.map(function (p) { return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' '),
+        fill: 'none', stroke: T.color || '#7c3aed', 'stroke-width': 3, opacity: 0.65, 'stroke-linecap': 'round'
+      }, g);
     });
     angles.forEach(function (A) {
       if (!points[A.v] || !points[A.a] || !points[A.b]) return;
@@ -602,98 +771,195 @@
   function handleClick(svg, evt) {
     var pos = svgPos(svg, evt);
     if (tool === 'point') {
-      getOrCreate(pos.x, pos.y);
+      var np = getOrCreate(pos.x, pos.y);
+      commit('点' + np + 'を追加');
     } else if (tool === 'segment' || tool === 'line' || tool === 'circle') {
       pending.push(getOrCreate(pos.x, pos.y));
       if (pending.length === 2) {
         if (pending[0] === pending[1]) { pending = []; render(); return; }
-        if (tool === 'segment') segments.push({ a: pending[0], b: pending[1] });
-        if (tool === 'line') lines.push({ a: pending[0], b: pending[1] });
-        if (tool === 'circle') circles.push({ c: pending[0], p: pending[1] });
+        if (tool === 'segment') { segments.push({ a: pending[0], b: pending[1] }); commit('線分' + pending[0] + pending[1]); }
+        if (tool === 'line') { lines.push({ a: pending[0], b: pending[1] }); commit('直線' + pending[0] + pending[1]); }
+        if (tool === 'circle') { circles.push({ c: pending[0], p: pending[1] }); commit('円（中心' + pending[0] + '）'); }
         pending = [];
       }
-    } else if (tool === 'perp') {
+    } else if (tool === 'perp' || tool === 'parallel') {
       if (pendingSeg < 0) {
         var i = hitSeg(pos.x, pos.y);
         if (i >= 0) pendingSeg = i;
       } else {
         var n = nearPoint(pos.x, pos.y) || getOrCreate(pos.x, pos.y);
         var S = segments[pendingSeg];
-        if (S && n !== S.a && n !== S.b) perps.push({ a: S.a, b: S.b, p: n });
+        if (S && n !== S.a && n !== S.b) {
+          if (tool === 'perp') { perps.push({ a: S.a, b: S.b, p: n }); commit('垂線（' + S.a + S.b + '・点' + n + '）'); }
+          else { parallels.push({ a: S.a, b: S.b, p: n }); commit('平行線（' + S.a + S.b + '・点' + n + '）'); }
+        }
         pendingSeg = -1;
       }
-    } else if (tool === 'angle') {
+    } else if (tool === 'angle' || tool === 'bisector') {
       pending.push(nearPoint(pos.x, pos.y) || getOrCreate(pos.x, pos.y));
       if (pending.length === 3) {
         // 1クリック目が頂点
-        angles.push({ v: pending[0], a: pending[1], b: pending[2] });
+        if (tool === 'angle') {
+          angles.push({ v: pending[0], a: pending[1], b: pending[2] });
+          commit('角度∠' + pending[1] + pending[0] + pending[2]);
+        } else {
+          bisectors.push({ v: pending[0], a: pending[1], b: pending[2] });
+          commit('二等分線（∠' + pending[1] + pending[0] + pending[2] + '）');
+        }
         pending = [];
       }
     } else if (tool === 'delete') {
-      var n = nearPoint(pos.x, pos.y);
-      if (n) { removePoint(n); render(); return; }
-      var si = hitSeg(pos.x, pos.y);
-      if (si >= 0) { segments.splice(si, 1); render(); return; }
+      if (deleteAt(pos.x, pos.y)) { commit('削除'); return; }
     }
     render();
   }
+  function distToLine(x, y, x1, y1, x2, y2) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var L2 = dx * dx + dy * dy || 1;
+    var t = ((x - x1) * dx + (y - y1) * dy) / L2;
+    return dist(x, y, x1 + t * dx, y1 + t * dy);
+  }
+  function deleteAt(x, y) {
+    var n = nearPoint(x, y);
+    if (n) { removePoint(n); render(); return true; }
+    var si = hitSeg(x, y);
+    if (si >= 0) { segments.splice(si, 1); render(); return true; }
+    var i, hit;
+    for (i = angles.length - 1; i >= 0; i--) {
+      var V = points[angles[i].v];
+      if (V && dist(x, y, V.x, V.y) <= 20) { angles.splice(i, 1); render(); return true; }
+    }
+    for (i = circles.length - 1; i >= 0; i--) {
+      var O = points[circles[i].c], R = points[circles[i].p];
+      if (O && R && Math.abs(dist(x, y, O.x, O.y) - dist(O.x, O.y, R.x, R.y)) <= 10) {
+        circles.splice(i, 1); render(); return true;
+      }
+    }
+    hit = hitLineLike(x, y);
+    if (hit) {
+      if (hit.kind === 'line') lines.splice(hit.i, 1);
+      if (hit.kind === 'perp') perps.splice(hit.i, 1);
+      if (hit.kind === 'parallel') parallels.splice(hit.i, 1);
+      if (hit.kind === 'bisector') bisectors.splice(hit.i, 1);
+      render();
+      return true;
+    }
+    return false;
+  }
+  function hitLineLike(x, y) {
+    var i, e;
+    for (i = lines.length - 1; i >= 0; i--) {
+      if (!points[lines[i].a] || !points[lines[i].b]) continue;
+      e = lineEnds(lines[i].a, lines[i].b);
+      if (distToLine(x, y, e.x1, e.y1, e.x2, e.y2) <= 10) return { kind: 'line', i: i };
+    }
+    var list = [[perps, 'perp'], [parallels, 'parallel']];
+    for (var k = 0; k < list.length; k++) {
+      var arr = list[k][0], kind = list[k][1];
+      for (i = arr.length - 1; i >= 0; i--) {
+        if (!points[arr[i].a] || !points[arr[i].b] || !points[arr[i].p]) continue;
+        var A = points[arr[i].a], B = points[arr[i].b], Q = points[arr[i].p];
+        var dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1;
+        if (kind === 'perp') { var tx = dx; dx = -dy; dy = tx; }
+        e = extEnds(Q.x, Q.y, dx / len, dy / len);
+        if (distToLine(x, y, e.x1, e.y1, e.x2, e.y2) <= 10) return { kind: kind, i: i };
+      }
+    }
+    for (i = bisectors.length - 1; i >= 0; i--) {
+      var Bc = bisectors[i];
+      if (!points[Bc.v] || !points[Bc.a] || !points[Bc.b]) continue;
+      var V = points[Bc.v];
+      var u1x = points[Bc.a].x - V.x, u1y = points[Bc.a].y - V.y;
+      var u2x = points[Bc.b].x - V.x, u2y = points[Bc.b].y - V.y;
+      var l1 = Math.hypot(u1x, u1y) || 1, l2 = Math.hypot(u2x, u2y) || 1;
+      var bx = u1x / l1 + u2x / l2, by = u1y / l1 + u2y / l2;
+      var bl = Math.hypot(bx, by);
+      if (bl < 1e-6) continue;
+      var re = rayEnds(V.x, V.y, bx / bl, by / bl);
+      if (distToLine(x, y, V.x, V.y, re.x2, re.y2) <= 10) return { kind: 'bisector', i: i };
+    }
+    return null;
+  }
   function attachDrag(svg) {
     var dragging = null;
+    var moved = false;
+    var traceColors = ['#7c3aed', '#db2777', '#0891b2', '#ea580c', '#16a34a'];
     svg.addEventListener('pointerdown', function (e) {
       if (tool !== 'select') return;
       var pos = svgPos(svg, e);
       var n = nearPoint(pos.x, pos.y);
       if (!n) return;
       dragging = n;
-      svg.setPointerCapture(e.pointerId);
+      moved = false;
+      if (traceOn) {
+        activeTrace = { pts: [[pos.x, pos.y]], color: traceColors[traces.length % traceColors.length] };
+        traces.push(activeTrace);
+      }
+      try { svg.setPointerCapture(e.pointerId); } catch (_) {}
       e.preventDefault();
     });
     svg.addEventListener('pointermove', function (e) {
       if (!dragging || !points[dragging]) return;
       var pos = svgPos(svg, e);
+      if (points[dragging].x !== pos.x || points[dragging].y !== pos.y) moved = true;
       points[dragging].x = pos.x; points[dragging].y = pos.y;
+      if (traceOn && activeTrace && activeTrace.pts.length < 400) {
+        var last = activeTrace.pts[activeTrace.pts.length - 1];
+        if (Math.hypot(pos.x - last[0], pos.y - last[1]) >= 4) activeTrace.pts.push([pos.x, pos.y]);
+      }
       render();
     });
     ['pointerup', 'pointercancel'].forEach(function (ev) {
-      svg.addEventListener(ev, function () { dragging = null; });
+      svg.addEventListener(ev, function () {
+        if (dragging && moved) commit('点' + dragging + 'を移動');
+        dragging = null;
+        moved = false;
+        activeTrace = null;
+      });
     });
   }
 
-  function serialize() {
+  function serialize(opts) {
     var pts = {};
     Object.keys(points).forEach(function (n) {
       pts[n] = { x: Math.round(points[n].x * 10) / 10, y: Math.round(points[n].y * 10) / 10 };
     });
-    return {
+    var out = {
       points: pts,
       segments: segments.map(function (s) { return [s.a, s.b]; }),
       lines: lines.map(function (s) { return [s.a, s.b]; }),
       circles: circles.map(function (c) { return [c.c, c.p]; }),
       perps: perps.map(function (p) { return { seg: [p.a, p.b], p: p.p }; }),
-      angles: angles.map(function (a) { return [a.v, a.a, a.b]; })
+      angles: angles.map(function (a) { return [a.v, a.a, a.b]; }),
+      bisectors: bisectors.map(function (b) { return [b.v, b.a, b.b]; }),
+      parallels: parallels.map(function (p) { return { seg: [p.a, p.b], p: p.p }; })
     };
+    if (opts && opts.traces) {
+      out.traces = traces.map(function (t) { return { pts: t.pts, color: t.color }; });
+    }
+    return out;
   }
   function load(d) {
     points = {}; segments = []; lines = []; circles = []; perps = []; angles = [];
-    nameSeq = 0; pending = []; pendingSeg = -1;
-    if (!d) { render(); return; }
-    Object.keys(d.points || {}).forEach(function (n) {
-      points[n] = { x: +d.points[n].x || 0, y: +d.points[n].y || 0 };
-    });
-    (d.segments || []).forEach(function (s) { if (points[s[0]] && points[s[1]]) segments.push({ a: s[0], b: s[1] }); });
-    (d.lines || []).forEach(function (s) { if (points[s[0]] && points[s[1]]) lines.push({ a: s[0], b: s[1] }); });
-    (d.circles || []).forEach(function (c) { if (points[c[0]] && points[c[1]]) circles.push({ c: c[0], p: c[1] }); });
-    (d.perps || []).forEach(function (p) {
-      if (points[p.seg[0]] && points[p.seg[1]] && points[p.p]) perps.push({ a: p.seg[0], b: p.seg[1], p: p.p });
-    });
-    (d.angles || []).forEach(function (a) {
-      if (points[a[0]] && points[a[1]] && points[a[2]]) angles.push({ v: a[0], a: a[1], b: a[2] });
-    });
+    bisectors = []; parallels = []; traces = [];
+    nameSeq = 0; pending = []; pendingSeg = -1; activeTrace = null;
+    history = []; hIndex = -1;
+    if (!d) { commit('開始'); render(); return; }
+    applySnapshot(d);
+    if (d.traces) {
+      traces = d.traces.filter(function (t) { return t.pts && t.pts.length >= 2; });
+    }
+    commit('開始');
     render();
   }
-  function clear() { load(null); }
+  function clear() {
+    traces = [];
+    load(null);
+    commit('全消去');
+    render();
+  }
   function stats() {
-    return { points: Object.keys(points).length, segments: segments.length, lines: lines.length, circles: circles.length, perps: perps.length, angles: angles.length };
+    return { points: Object.keys(points).length, segments: segments.length, lines: lines.length, circles: circles.length, perps: perps.length, angles: angles.length, bisectors: bisectors.length, parallels: parallels.length, traces: traces.length };
   }
 
   global.ConstructionBoard = {
@@ -702,6 +968,12 @@
     serialize: serialize, load: load, clear: clear, stats: stats,
     setSnap: function (v) { snap = !!v; },
     isSnap: function () { return snap; },
-    setOnChange: function (fn) { onChange = fn; }
+    setOnChange: function (fn) { onChange = fn; },
+    setTrace: function (v) { traceOn = !!v; if (!traceOn) activeTrace = null; },
+    isTrace: function () { return traceOn; },
+    undo: undo, redo: redo, jumpTo: jumpTo,
+    getHistory: function () { return history.map(function (h) { return h.label; }); },
+    getHistoryIndex: function () { return hIndex; },
+    getFullState: getFullState, restoreFullState: restoreFullState
   };
 })(window);
