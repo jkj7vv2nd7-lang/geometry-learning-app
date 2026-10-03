@@ -271,6 +271,13 @@
               <button id="journal-save-btn" type="button" class="tool-btn" title="最新のAI検証結果と合わせて記録">📌 記録する</button>
             </div>
             <p class="text-xs text-slate-500">②「🔍 AI検証」を押した後に「📌 記録する」を押すと、予想と検証結果がセットで残ります。</p>
+            <div class="flex flex-wrap gap-2" aria-label="記録帳の保存と復元">
+              <button id="journal-export-json-btn" type="button" class="tool-btn">⬇️ 記録をJSON保存</button>
+              <button id="journal-export-csv-btn" type="button" class="tool-btn">⬇️ 記録をCSV保存</button>
+              <button id="journal-import-btn" type="button" class="tool-btn">⬆️ JSONから復元</button>
+              <input id="journal-import-input" type="file" accept="application/json,.json" class="hidden" />
+            </div>
+            <p id="journal-export-status" class="text-xs text-slate-600" role="status" aria-live="polite"></p>
             <div id="journal-entries" class="space-y-2 max-h-[260px] overflow-y-auto" aria-live="polite"></div>
           </div>
           </div>
@@ -284,24 +291,24 @@
           </div>
           <div id="quest-body">
             <div id="quest-filters" class="flex flex-wrap gap-1.5 px-3 py-2" role="group" aria-label="学校段階フィルタ">
-              <button type="button" data-quest-level="all" class="construct-tool construct-tool-active">全部</button>
-              <button type="button" data-quest-level="elem" class="construct-tool">小学校</button>
-              <button type="button" data-quest-level="junior" class="construct-tool">中学校</button>
-              <button type="button" data-quest-level="high" class="construct-tool">高校</button>
+              <button type="button" data-quest-level="all" aria-pressed="true" class="construct-tool construct-tool-active">全部</button>
+              <button type="button" data-quest-level="elem" aria-pressed="false" class="construct-tool">小学校</button>
+              <button type="button" data-quest-level="junior" aria-pressed="false" class="construct-tool">中学校</button>
+              <button type="button" data-quest-level="high" aria-pressed="false" class="construct-tool">高校</button>
             </div>
             <div class="grid gap-2 px-3 pb-2 sm:grid-cols-2">
               <label class="text-xs font-bold">学年
-                <select id="quest-grade-filter" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
+                <select id="quest-grade-filter" aria-label="課題を学年で絞り込む" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
                   <option value="all">すべての学年</option>
                 </select>
               </label>
               <label class="text-xs font-bold">単元
-                <select id="quest-unit-filter" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
+                <select id="quest-unit-filter" aria-label="課題を単元で絞り込む" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
                   <option value="all">すべての単元</option>
                 </select>
               </label>
             </div>
-            <div id="quest-list" class="p-3 grid gap-2 sm:grid-cols-2" aria-live="polite"></div>
+            <div id="quest-list" class="p-3 grid gap-2 sm:grid-cols-2" aria-live="polite" aria-label="探究課題一覧"></div>
             <div id="quest-active" class="hidden p-3 border-t flex flex-col gap-2">
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <h3 id="quest-active-title" class="font-extrabold"></h3>
@@ -310,6 +317,9 @@
               <p id="quest-active-goal" class="text-sm"></p>
               <div id="quest-learning-context" class="grid gap-2 sm:grid-cols-2"></div>
               <ol id="quest-steps" class="space-y-1 text-sm"></ol>
+              <label for="quest-reflection-input" class="text-sm font-bold">発見したこと・根拠（必須）
+                <textarea id="quest-reflection-input" rows="3" aria-required="true" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm" placeholder="作図や測定で分かったことを、自分の言葉で書こう。"></textarea>
+              </label>
               <div class="flex flex-wrap gap-2">
                 <button id="quest-start-btn" type="button" class="tool-btn verify-btn" title="作図キャンバスへ移動して課題を試す">✏️ 作図キャンバスで試す</button>
                 <button id="quest-prediction-btn" type="button" class="tool-btn" title="予想を記録帳の入力欄へ送る">📓 予想を記録帳へ</button>
@@ -317,8 +327,9 @@
                 <button id="quest-hint-btn" type="button" class="tool-btn" title="ヒントを1つ見る">💡 ヒント</button>
                 <button id="quest-check-btn" type="button" class="tool-btn verify-btn" title="作図が課題を満たすか自動判定">🏁 できた！チェック</button>
               </div>
+              <p class="text-xs text-slate-600">チェックは作図の要素数と探究手順の記録です。性質の理解・証明を自動判定するものではありません。発見したことと根拠も記録しましょう。</p>
               <div id="quest-hints" class="text-sm space-y-1" aria-live="polite"></div>
-              <div id="quest-result" class="text-sm" aria-live="polite"></div>
+              <div id="quest-result" class="text-sm" role="status" aria-live="polite"></div>
             </div>
           </div>
         </section>
@@ -360,8 +371,16 @@
             <h2 class="font-extrabold">🗺 図形探究課題ライブラリ</h2>
             <p class="text-sm text-slate-600">学年・単元別の課題を選び、作図活動や授業導入に活用できます。</p>
           </div>
-          <button id="teacher-quest-btn" type="button" class="tool-btn">課題を選ぶ・作図する</button>
+          <div class="flex flex-wrap gap-2 items-center">
+            <label for="teacher-quest-select" class="text-sm font-bold">課題を選択</label>
+            <select id="teacher-quest-select" class="border rounded-xl px-3 py-2 text-sm min-h-[44px]"></select>
+            <button id="teacher-quest-download-btn" type="button" class="tool-btn">⬇️ ワークシート保存</button>
+            <button id="teacher-quest-print-btn" type="button" class="tool-btn">🖨️ 印刷</button>
+            <button id="teacher-quest-open-btn" type="button" class="tool-btn">✏️ 作図で試す</button>
+          </div>
+          <p id="teacher-quest-status" class="w-full text-xs text-slate-600" role="status" aria-live="polite"></p>
         </section>
+        <section id="teacher-quest-preview" class="bg-white rounded-2xl shadow p-5" aria-live="polite" aria-label="授業用探究課題プレビュー"></section>
         <!-- タブバー -->
         <div id="teacher-tabs" role="tablist" aria-label="教師用出力タブ" class="bg-white rounded-2xl shadow p-2 flex flex-col sm:flex-row gap-2">
           <button id="tab-lesson-plan" role="tab" aria-selected="true" aria-controls="panel-lesson-plan" data-teacher-tab="lesson-plan" class="teacher-tab teacher-tab-active">📝 指導案出力</button>
@@ -453,6 +472,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="js/renderer.js" defer></script>
   <script src="js/quests.js" defer></script>
+  <script src="js/quest-validation.js" defer></script>
   <script src="js/app.js" defer></script>
   <!-- 3D立体ビュー（three.jsモジュール） -->
   <script type="importmap">

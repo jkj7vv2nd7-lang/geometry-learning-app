@@ -529,4 +529,140 @@
       complete: '平行四辺形の面積は底辺×高さ！'
     }
   ]);
+
+  function starter(points, segments, extras) {
+    var data = {
+      points: points,
+      segments: segments || [],
+      lines: [],
+      circles: [],
+      perps: [],
+      angles: [],
+      bisectors: [],
+      parallels: [],
+      pbis: [],
+      tangents: []
+    };
+    Object.keys(extras || {}).forEach(function (key) { data[key] = extras[key]; });
+    return data;
+  }
+  var triangle = starter(
+    { A: { x: 240, y: 360 }, B: { x: 400, y: 150 }, C: { x: 560, y: 360 } },
+    [['A', 'B'], ['B', 'C'], ['C', 'A']],
+    { angles: [['A', 'B', 'C'], ['B', 'A', 'C'], ['C', 'A', 'B']] }
+  );
+  var parallelLines = starter(
+    { A: { x: 180, y: 160 }, B: { x: 620, y: 160 }, C: { x: 180, y: 340 }, D: { x: 620, y: 340 }, E: { x: 300, y: 80 }, F: { x: 500, y: 420 } },
+    [['E', 'F']],
+    { parallels: [{ seg: ['A', 'B'], p: 'C' }], angles: [['C', 'E', 'F'], ['A', 'E', 'F']] }
+  );
+  var circleOnDiameter = starter(
+    { O: { x: 400, y: 250 }, X: { x: 250, y: 250 }, Y: { x: 550, y: 250 }, Z: { x: 400, y: 100 } },
+    [['X', 'Y'], ['X', 'Z'], ['Y', 'Z']],
+    { circles: [['O', 'X']], angles: [['Z', 'X', 'Y']] }
+  );
+  var quadrilateral = starter(
+    { A: { x: 220, y: 170 }, B: { x: 570, y: 170 }, C: { x: 530, y: 370 }, D: { x: 260, y: 370 } },
+    [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']]
+  );
+  var circle = starter(
+    { O: { x: 400, y: 250 }, A: { x: 280, y: 250 }, B: { x: 520, y: 250 }, C: { x: 360, y: 130 }, D: { x: 440, y: 370 } },
+    [['A', 'B'], ['A', 'C'], ['B', 'C'], ['A', 'D'], ['B', 'D']],
+    { circles: [['O', 'A']], angles: [['C', 'A', 'B'], ['D', 'A', 'B'], ['O', 'A', 'B']] }
+  );
+  var starterByQuest = {
+    'angle-sum': triangle,
+    isosceles: starter(
+      { A: { x: 400, y: 150 }, B: { x: 250, y: 350 }, C: { x: 550, y: 350 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A']],
+      { angles: [['A', 'B', 'C'], ['B', 'A', 'C'], ['C', 'A', 'B']] }
+    ),
+    'parallel-angles': parallelLines,
+    pythagoras: starter(
+      { A: { x: 220, y: 350 }, B: { x: 220, y: 170 }, C: { x: 460, y: 350 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A']],
+      { angles: [['A', 'B', 'C'], ['B', 'A', 'C'], ['C', 'A', 'B']], perps: [{ seg: ['A', 'C'], p: 'B' }] }
+    ),
+    thales: circleOnDiameter,
+    circumcenter: starter(
+      { A: { x: 250, y: 180 }, B: { x: 560, y: 220 }, C: { x: 400, y: 430 }, O: { x: 398, y: 300 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A']],
+      { pbis: [['A', 'B'], ['B', 'C']], circles: [['O', 'A']] }
+    ),
+    'junior1-pbis-locus': starter(
+      { A: { x: 260, y: 250 }, B: { x: 540, y: 250 }, C: { x: 400, y: 150 }, D: { x: 400, y: 350 } },
+      [['A', 'B']],
+      { pbis: [['A', 'B']] }
+    ),
+    'junior1-angle-bisector-locus': starter(
+      { A: { x: 400, y: 330 }, B: { x: 240, y: 150 }, C: { x: 560, y: 150 }, D: { x: 400, y: 200 }, E: { x: 330, y: 260 }, F: { x: 470, y: 260 } },
+      [['A', 'B'], ['A', 'C']],
+      { bisectors: [['A', 'B', 'C']], perps: [{ seg: ['A', 'B'], p: 'E' }, { seg: ['A', 'C'], p: 'F' }] }
+    ),
+    'junior1-circle-tangent': starter(
+      { O: { x: 400, y: 250 }, A: { x: 520, y: 250 }, B: { x: 400, y: 130 } },
+      [],
+      { circles: [['O', 'A']], tangents: [['O', 'A']] }
+    ),
+    'junior1-solid-views': starter(
+      { A: { x: 250, y: 170 }, B: { x: 430, y: 170 }, C: { x: 430, y: 350 }, D: { x: 250, y: 350 }, E: { x: 330, y: 100 }, F: { x: 510, y: 100 }, G: { x: 510, y: 280 }, H: { x: 330, y: 280 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['E', 'F'], ['F', 'G'], ['G', 'H'], ['H', 'E'], ['A', 'E'], ['B', 'F'], ['C', 'G'], ['D', 'H']]
+    ),
+    'junior2-exterior-angle': triangle,
+    'junior2-parallelogram': starter(
+      { A: { x: 220, y: 180 }, B: { x: 500, y: 180 }, C: { x: 570, y: 350 }, D: { x: 290, y: 350 }, E: { x: 395, y: 265 }, F: { x: 395, y: 265 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['A', 'C'], ['B', 'D']]
+    ),
+    'junior2-congruence': starter(
+      { A: { x: 180, y: 330 }, B: { x: 280, y: 160 }, C: { x: 380, y: 330 }, D: { x: 430, y: 330 }, E: { x: 530, y: 160 }, F: { x: 630, y: 330 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'E'], ['E', 'F'], ['F', 'D']]
+    ),
+    'junior2-polygon-sum': starter(
+      { A: { x: 220, y: 250 }, B: { x: 320, y: 150 }, C: { x: 470, y: 180 }, D: { x: 550, y: 300 }, E: { x: 350, y: 380 }, F: { x: 350, y: 150 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'A'], ['A', 'C'], ['A', 'D']]
+    ),
+    'junior3-similarity': starter(
+      { A: { x: 180, y: 350 }, B: { x: 300, y: 150 }, C: { x: 400, y: 350 }, D: { x: 450, y: 350 }, E: { x: 570, y: 150 }, F: { x: 670, y: 350 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'E'], ['E', 'F'], ['F', 'D']],
+      { angles: [['A', 'B', 'C'], ['B', 'A', 'C'], ['C', 'A', 'B'], ['D', 'E', 'F'], ['E', 'D', 'F'], ['F', 'D', 'E']] }
+    ),
+    'junior3-parallel-ratio': parallelLines,
+    'junior3-similarity-height': triangle,
+    'junior3-circle-angle': circle,
+    'elem-circle': circle,
+    'elem-quadrilaterals': quadrilateral,
+    'elem-triangle-area': triangle,
+    'elem-polygon-angle': starter(
+      { A: { x: 220, y: 250 }, B: { x: 330, y: 150 }, C: { x: 470, y: 170 }, D: { x: 560, y: 280 }, E: { x: 350, y: 380 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'E'], ['E', 'A'], ['A', 'C'], ['A', 'D']]
+    ),
+    'high-triangle-centers': starter(
+      { A: { x: 250, y: 180 }, B: { x: 560, y: 220 }, C: { x: 400, y: 430 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A']],
+      { pbis: [['A', 'B'], ['B', 'C']], bisectors: [['A', 'B', 'C'], ['B', 'A', 'C']] }
+    ),
+    'high-chord-center': circle,
+    'high-coordinate-distance': triangle,
+    'high-circle-equation': circle,
+    'high-trigonometric-ratio': triangle,
+    'high-vector-midpoint': quadrilateral,
+    'elem-symmetry': starter(
+      { A: { x: 280, y: 250 }, B: { x: 520, y: 250 }, O: { x: 400, y: 120 }, C: { x: 400, y: 380 } },
+      [['A', 'B']],
+      { lines: [['O', 'C']], perps: [{ seg: ['O', 'C'], p: 'A' }] }
+    ),
+    'elem-parallelogram-area': quadrilateral
+  };
+  global.QUESTS.forEach(function (q) {
+    if (starterByQuest[q.id]) q.starter = JSON.parse(JSON.stringify(starterByQuest[q.id]));
+  });
+  var locallyVerifiable = {
+    'angle-sum': { kind: 'geometry_triangle_angle_sum' },
+    isosceles: { kind: 'geometry_isosceles_base_angles' },
+    pythagoras: { kind: 'geometry_pythagorean' },
+    thales: { kind: 'geometry_thales_right_angle' }
+  };
+  global.QUESTS.forEach(function (q) {
+    if (locallyVerifiable[q.id]) q.checks = [locallyVerifiable[q.id]];
+  });
 })(window);
