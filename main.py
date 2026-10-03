@@ -13,6 +13,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import threading
+import time
 from pathlib import Path
 from typing import List
 
@@ -57,6 +60,45 @@ app.add_middleware(
 @app.on_event("startup")
 def _log_ai_provider() -> None:
     logging.getLogger(__name__).warning("AI provider status at startup: %s", ai_agent.get_provider_status())
+    _maybe_start_autoshutdown()
+
+
+# ---------------- 自動終了（ブラウザを閉じたらサーバーも終了） ----------------
+# start-app.bat が AUTO_SHUTDOWN=1 を付けて起動した場合のみ有効。
+# フロントが /api/ping を定期送信し、一定時間途絶えたらプロセスを終了する。
+_LAST_PING = time.time()
+
+
+def _autoshutdown_after() -> float:
+    try:
+        return max(10.0, float(os.environ.get("AUTO_SHUTDOWN_AFTER", "120")))
+    except ValueError:
+        return 120.0
+
+
+def _maybe_start_autoshutdown() -> None:
+    if os.environ.get("AUTO_SHUTDOWN") != "1":
+        return
+
+    def _watchdog() -> None:
+        after = _autoshutdown_after()
+        logging.getLogger(__name__).warning(
+            "Auto-shutdown enabled: exiting after %.0fs without browser heartbeat.", after)
+        while True:
+            time.sleep(15)
+            if time.time() - _LAST_PING > after:
+                logging.getLogger(__name__).warning("No browser heartbeat; shutting down.")
+                os._exit(0)
+
+    threading.Thread(target=_watchdog, daemon=True).start()
+
+
+@app.post("/api/ping")
+def ping() -> dict:
+    """ブラウザ生存通知（ハートビート）。"""
+    global _LAST_PING
+    _LAST_PING = time.time()
+    return {"status": "ok"}
 
 
 # ---------------- 教育コンテンツ生成（AIモデル非依存の共通IFに委譲） ----------------

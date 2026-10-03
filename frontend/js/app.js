@@ -9,6 +9,7 @@
   var API_BASE = ''; // 同一オリジン配信時は '' のまま。分離時は 'http://localhost:8000' 等に変更
   var ENDPOINT_GENERATE = API_BASE + '/api/generate-geometry';
   var ENDPOINT_CHAT = API_BASE + '/api/chat';
+  var ENDPOINT_PING = API_BASE + '/api/ping';
   var ENDPOINT_VERIFY = API_BASE + '/api/verify-construction';
   var ENDPOINT_DISCOVER = API_BASE + '/api/discover-theorems';
   var CONSTRUCT_STORE_KEY = 'construction-v1';
@@ -772,6 +773,17 @@
     }
   }
 
+  // ---------- 生存通知（タブを開いている間だけ送信。閉じればサーバーが自動終了） ----------
+  function sendHeartbeat() {
+    try {
+      fetch(ENDPOINT_PING, { method: 'POST', keepalive: true }).catch(function () {});
+    } catch (_) {}
+  }
+  function initHeartbeat() {
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 15000);
+  }
+
   function initMisc() {
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
@@ -844,6 +856,7 @@
     initJsonButtons();
     initConstructionBoard();
     initFunctionGraph();
+    initHeartbeat();
     initMisc();
     setStatus('待機中', null);
   });
