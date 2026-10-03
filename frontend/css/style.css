@@ -33,6 +33,24 @@
   color: #fff !important;
   box-shadow: 0 4px 12px rgba(245, 158, 0, 0.45);
 }
+.teacher-lesson-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #f8fafc;
+  font-size: 0.8rem;
+}
+.teacher-lesson-chip button {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  color: #475569;
+  font-weight: 800;
+}
+.teacher-lesson-chip button:hover { background: #e2e8f0; }
 .verify-btn {
   background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
   color: #fff !important;

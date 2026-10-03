@@ -109,11 +109,66 @@ test('local Thales validation requires a diameter, a circle point, and a right a
   assert.equal(check('geometry_thales_right_angle', data)[0].ok, false);
 });
 
+test('middle-school geometry checks accept intended examples and reject counterexamples', () => {
+  const fixtures = [
+    ['parallel-angles', 'geometry_parallel_lines'],
+    ['junior1-pbis-locus', 'geometry_perpendicular_bisector_locus'],
+    ['junior1-angle-bisector-locus', 'geometry_angle_bisector_locus'],
+    ['junior1-circle-tangent', 'geometry_tangent_radius'],
+    ['junior2-exterior-angle', 'geometry_triangle_exterior_angle'],
+    ['junior2-parallelogram', 'geometry_parallelogram'],
+    ['junior2-congruence', 'geometry_congruent_triangles'],
+    ['junior3-similarity', 'geometry_similar_triangles'],
+    ['junior3-parallel-ratio', 'geometry_parallel_side_ratio'],
+    ['junior3-similarity-height', 'geometry_similar_triangles'],
+    ['junior3-circle-angle', 'geometry_inscribed_angle'],
+    ['high-chord-center', 'geometry_circle_chord_bisector']
+  ];
+  for (const [questId, kind] of fixtures) {
+    const quest = quests.find((item) => item.id === questId);
+    assert.ok(quest, `${questId} exists`);
+    assert.ok(check(kind, quest.starter)[0].ok, `${questId} guided starter satisfies ${kind}`);
+    if (quest.starterVariants.counterexample) {
+      assert.equal(check(kind, quest.starterVariants.counterexample)[0].ok, false,
+        `${questId} counterexample is rejected by ${kind}`);
+    }
+  }
+});
+
+test('circle-angle, locus, and side-ratio checks use actual coordinates rather than tool counts', () => {
+  const circle = {
+    points: { O: { x: 0, y: 0 }, A: { x: -5, y: 0 }, B: { x: 5, y: 0 }, C: { x: 0, y: 5 } },
+    circles: [['O', 'A']],
+    angles: [['O', 'A', 'B'], ['C', 'A', 'B']]
+  };
+  assert.equal(check('geometry_inscribed_angle', circle)[0].ok, true);
+  circle.points.C.y = 4;
+  assert.equal(check('geometry_inscribed_angle', circle)[0].ok, false);
+
+  const ratio = {
+    points: {
+      A: { x: 0, y: 0 }, B: { x: 8, y: 0 }, C: { x: 0, y: 8 },
+      D: { x: 4, y: 0 }, E: { x: 0, y: 4 }
+    },
+    segments: [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'E']]
+  };
+  assert.equal(check('geometry_parallel_side_ratio', ratio)[0].ok, true);
+  ratio.points.E.y = 2;
+  assert.equal(check('geometry_parallel_side_ratio', ratio)[0].ok, false);
+});
+
+test('unknown and server-only geometry requirements never pass locally', () => {
+  assert.equal(check('geometry_not_implemented', { points: {} })[0].ok, false);
+  assert.equal(check('has_theorem', { points: {} })[0].ok, false);
+});
+
 test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and journal backups', () => {
   const html = fs.readFileSync(path.join(root, 'frontend/index.html'), 'utf8');
   for (const id of ['quest-grade-filter', 'quest-unit-filter', 'quest-reflection-input', 'teacher-quest-select',
     'teacher-quest-download-btn', 'teacher-quest-print-btn', 'journal-export-json-btn', 'journal-export-csv-btn',
-    'journal-import-input']) {
+    'journal-import-input', 'quest-starter-guided-btn', 'quest-starter-counterexample-btn', 'quest-starter-blank-btn',
+    'quest-resume-btn', 'teacher-lesson-add-btn', 'teacher-lesson-print-btn', 'teacher-worksheet-audience',
+    'journal-export-portfolio-btn']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /data-quest-level="all" aria-pressed="true"/);
@@ -127,4 +182,6 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
   assert.match(app, /if \(questStepDone\.some\(function \(done\) \{ return !done; \}\)\)/);
   assert.match(app, /if \(!reflection\)/);
   assert.match(app, /JSON\.parse\(String\(reader\.result/);
+  assert.match(app, /氏名・予想・振り返り・自由記述は含みません/);
+  assert.match(app, /function scheduleQuestDraftSave/);
 });

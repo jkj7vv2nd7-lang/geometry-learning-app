@@ -546,6 +546,7 @@
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(function () {
         try { localStorage.setItem(CONSTRUCT_STORE_KEY, JSON.stringify(CB.getFullState())); } catch (_) {}
+        scheduleQuestDraftSave();
       }, 400);
     });
     // 前回の作図・履歴を復元（なければ「開始」で初期化）
@@ -667,6 +668,7 @@
       return stored.filter(function (entry) { return entry && typeof entry === 'object'; }).map(function (entry) {
         return {
           time: String(entry.time || ''),
+          createdAt: String(entry.createdAt || ''),
           prediction: String(entry.prediction || ''),
           checks: Array.isArray(entry.checks) ? entry.checks.filter(function (check) {
             return check && typeof check === 'object';
@@ -735,6 +737,42 @@
     }
     if (status) status.textContent = entries.length + '件の探求記録をダウンロードしました。記録はこのブラウザ内にも保存されています。';
   }
+  function exportAnonymousPortfolio() {
+    var entries = loadJournal();
+    var status = $('journal-export-status');
+    if (!entries.length) {
+      if (status) status.textContent = 'ポートフォリオに含める活動記録がありません。';
+      return;
+    }
+    var timeline = entries.map(function (entry) {
+      var timestamp = Date.parse(entry.createdAt || entry.time);
+      return {
+        date: Number.isFinite(timestamp) ? new Date(timestamp).toISOString().slice(0, 10) : '',
+        questId: entry.questId || '',
+        questTitle: entry.questTitle || '',
+        checkCount: entry.checks.length,
+        confirmedCount: entry.checks.filter(function (check) { return check.passed; }).length
+      };
+    }).sort(function (a, b) { return a.date.localeCompare(b.date); });
+    var completedByQuest = Object.create(null);
+    timeline.forEach(function (item) {
+      if (!item.questId) return;
+      if (!completedByQuest[item.questId]) completedByQuest[item.questId] = {
+        questId: item.questId, title: item.questTitle, activities: 0
+      };
+      completedByQuest[item.questId].activities++;
+    });
+    downloadFile('geometry-inquiry-anonymous-portfolio-' + new Date().toISOString().slice(0, 10) + '.json',
+      JSON.stringify({
+        schemaVersion: 1,
+        privacy: '氏名・予想・振り返り・自由記述は含みません。',
+        activityCount: timeline.length,
+        questCount: Object.keys(completedByQuest).length,
+        quests: Object.keys(completedByQuest).map(function (id) { return completedByQuest[id]; }),
+        timeline: timeline
+      }, null, 2), 'application/json;charset=utf-8');
+    if (status) status.textContent = '匿名ポートフォリオを保存しました（氏名・予想・振り返り・自由記述は含めていません）。';
+  }
   function renderJournal() {
     var box = $('journal-entries');
     if (!box) return;
@@ -744,8 +782,14 @@
       box.innerHTML = '<p class="text-xs text-slate-400">まだ記録がありません。予想→AI検証→記録の順に使ってみよう。</p>';
       return;
     }
-    entries.slice().reverse().forEach(function (en, ri) {
-      var idx = entries.length - 1 - ri;
+    entries.map(function (entry, index) { return { entry: entry, index: index }; })
+      .sort(function (a, b) {
+        var first = Date.parse(a.entry.createdAt || a.entry.time);
+        var second = Date.parse(b.entry.createdAt || b.entry.time);
+        if (!Number.isFinite(first) || !Number.isFinite(second)) return a.index - b.index;
+        return second - first;
+      }).forEach(function (item) {
+      var en = item.entry, idx = item.index;
       var div = document.createElement('div');
       div.className = 'journal-entry';
       var okCount = en.checks.filter(function (c) { return c.passed; }).length;
@@ -781,7 +825,12 @@
       if (!pred) { addChatMessage('📓 まず予想を入力してね（例：この三角形は直角のはず）。', 'ai'); if (inp) inp.focus(); return; }
       if (!lastVerify) { addChatMessage('📓 「🔍 AI検証」を押してから記録してね。予想と検証結果がセットで残ります。', 'ai'); return; }
       var arr = loadJournal();
-      arr.push({ time: new Date().toLocaleString('ja-JP'), prediction: pred, checks: lastVerify.checks, comment: lastVerify.comment });
+      arr.push({
+        time: new Date().toLocaleString('ja-JP'), createdAt: new Date().toISOString(),
+        prediction: pred, checks: lastVerify.checks, comment: lastVerify.comment,
+        questId: activeQuest ? activeQuest.id : '', questTitle: activeQuest ? activeQuest.title : '',
+        reflection: activeQuest && $('quest-reflection-input') ? $('quest-reflection-input').value.trim() : ''
+      });
       if (!saveJournal(arr)) return;
       if (inp) inp.value = '';
       renderJournal();
@@ -789,8 +838,10 @@
     });
     var jsonBtn = $('journal-export-json-btn');
     var csvBtn = $('journal-export-csv-btn');
+    var portfolioBtn = $('journal-export-portfolio-btn');
     if (jsonBtn) jsonBtn.addEventListener('click', function () { exportJournal('json'); });
     if (csvBtn) csvBtn.addEventListener('click', function () { exportJournal('csv'); });
+    if (portfolioBtn) portfolioBtn.addEventListener('click', exportAnonymousPortfolio);
     var importBtn = $('journal-import-btn');
     var importInput = $('journal-import-input');
     if (importBtn && importInput) {
@@ -814,6 +865,7 @@
             var additions = incoming.map(function (entry) {
               return {
                 time: String(entry.time || ''),
+                createdAt: String(entry.createdAt || ''),
                 prediction: String(entry.prediction),
                 checks: Array.isArray(entry.checks) ? entry.checks : [],
                 comment: String(entry.comment || ''),
@@ -1356,6 +1408,40 @@
   var questUnitFilter = 'all';
   var questStepDone = [];
   var questHintIdx = 0;
+  var questDraftTimer = null;
+  function questDraftKey(id) { return 'quest-draft-v1-' + id; }
+  function readQuestDraft(id) {
+    try {
+      var draft = JSON.parse(localStorage.getItem(questDraftKey(id)) || 'null');
+      return draft && typeof draft === 'object' ? draft : null;
+    } catch (_) { return null; }
+  }
+  function scheduleQuestDraftSave() {
+    if (!activeQuest) return;
+    if (questDraftTimer) clearTimeout(questDraftTimer);
+    questDraftTimer = setTimeout(saveQuestDraft, 450);
+  }
+  function saveQuestDraft() {
+    if (!activeQuest || !window.ConstructionBoard) return;
+    try {
+      localStorage.setItem(questDraftKey(activeQuest.id), JSON.stringify({
+        savedAt: new Date().toISOString(),
+        construction: window.ConstructionBoard.serialize(),
+        steps: questStepDone.slice(),
+        prediction: $('journal-prediction-input') ? $('journal-prediction-input').value : '',
+        reflection: $('quest-reflection-input') ? $('quest-reflection-input').value : '',
+        hintIndex: questHintIdx
+      }));
+      var status = $('quest-draft-status');
+      if (status) status.textContent = 'この課題の作図・手順・振り返りをこのブラウザに保存しました。';
+      var resume = $('quest-resume-btn');
+      if (resume) resume.classList.remove('hidden');
+    } catch (err) {
+      var status = $('quest-draft-status');
+      if (status) status.textContent = '下書きを保存できませんでした。ブラウザの保存容量を確認してください。';
+      console.error('探求課題の下書きを保存できませんでした:', err);
+    }
+  }
 
   function questsForStage() {
     return (window.QUESTS || []).filter(function (q) {
@@ -1429,6 +1515,10 @@
     var q = null;
     (window.QUESTS || []).forEach(function (x) { if (x.id === id) q = x; });
     if (!q) return;
+    if (activeQuest && activeQuest.id !== q.id) {
+      if (questDraftTimer) clearTimeout(questDraftTimer);
+      saveQuestDraft();
+    }
     activeQuest = q;
     questStepDone = q.steps.map(function () { return false; });
     questHintIdx = 0;
@@ -1465,6 +1555,7 @@
           questStepDone[idx] = !questStepDone[idx];
           btn.classList.toggle('quest-step-done', questStepDone[idx]);
           btn.setAttribute('aria-pressed', String(questStepDone[idx]));
+          scheduleQuestDraftSave();
         });
       })(i, b);
       b.setAttribute('aria-pressed', 'false');
@@ -1474,11 +1565,17 @@
     $('quest-hints').innerHTML = '';
     $('quest-result').innerHTML = '';
     $('quest-reflection-input').value = '';
-    var st = $('quest-starter-btn');
-    if (st) {
-      st.classList.toggle('hidden', !q.starter);
-      st.textContent = q.starter ? '🧩 お手本を配置（現在の作図を置換）' : '🧩 お手本なし';
-    }
+    var counterexampleBtn = $('quest-starter-counterexample-btn');
+    if (counterexampleBtn) counterexampleBtn.classList.toggle('hidden', !(q.starterVariants && q.starterVariants.counterexample));
+    var resumeBtn = $('quest-resume-btn');
+    if (resumeBtn) resumeBtn.classList.toggle('hidden', !readQuestDraft(q.id));
+    var draftStatus = $('quest-draft-status');
+    if (draftStatus) draftStatus.textContent = readQuestDraft(q.id) ? '保存した下書きがあります。「保存した下書きを再開」から続けられます。' :
+      '課題の作図・手順・振り返りはこのブラウザに自動保存されます。';
+    var reflectionInput = $('quest-reflection-input');
+    if (reflectionInput) reflectionInput.oninput = scheduleQuestDraftSave;
+    var predictionInput = $('journal-prediction-input');
+    if (predictionInput) predictionInput.oninput = scheduleQuestDraftSave;
     $('quest-active').classList.remove('hidden');
     $('quest-active').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -1505,7 +1602,8 @@
     });
   }
 
-  function teacherWorksheet(q) {
+  function teacherWorksheet(q, audience) {
+    var teacher = audience !== 'learner';
     var lines = [
       '# ' + q.title,
       '',
@@ -1523,12 +1621,24 @@
       '## 活動手順'
     ];
     q.steps.forEach(function (step, index) { lines.push((index + 1) + '. ' + step); });
-    lines.push('', '## 着目点', q.focus, '', '## 予想', q.prediction,
-      '', '## 検証', q.validation, '', '## 発見・まとめ', q.discovery,
-      '', '## 教師用メモ', '観察・測定の結果と、性質が成り立つ理由を区別して説明させます。',
-      '課題画面の自動チェックは作図要素と学習手順の確認です。数学的な証明や理解度評価の代わりにはなりません。');
+    lines.push('', '## 予想・記録', '予想: ______________________________________________',
+      '', '測定・作図で確かめたこと: ____________________________',
+      '', '発見したことと根拠: __________________________________');
+    if (teacher) {
+      lines.push('', '## 着目点', q.focus, '', '## 予想の視点', q.prediction,
+        '', '## 検証の観点', q.validation, '', '## 発見・まとめ', q.discovery,
+        '', '## 授業準備', '想定時間: ' + (q.lessonMinutes || 20) + '分',
+        '準備物: 作図キャンバス（端末・ブラウザ）。必要に応じて定規・コンパス。',
+        '', '## 観点別評価メモ',
+        '知識・技能: 作図・測定を適切に行い、必要な性質を用いている。',
+        '思考・判断・表現: 予想を立て、複数の例や反例を用いて関係を説明している。',
+        '主体的に学習に取り組む態度: 点や図形を動かして確かめ、予想を振り返っている。',
+        '', '## 教師用メモ', '観察・測定の結果と、性質が成り立つ理由を区別して説明させます。',
+        '課題画面の自動チェックは作図要素と学習手順の確認です。数学的な証明や理解度評価の代わりにはなりません。');
+    }
     return lines.join('\n');
   }
+  var LESSON_SET_STORE_KEY = 'teacher-lesson-set-v1';
   function initTeacherQuestLibrary() {
     var select = $('teacher-quest-select');
     var preview = $('teacher-quest-preview');
@@ -1554,6 +1664,10 @@
       meta.textContent = q.grade + '・' + q.unit;
       preview.appendChild(title);
       preview.appendChild(meta);
+      var lessonMeta = document.createElement('p');
+      lessonMeta.className = 'text-xs text-slate-600 mb-2';
+      lessonMeta.textContent = '想定 ' + (q.lessonMinutes || 20) + '分・準備: 作図キャンバス（端末・ブラウザ）';
+      preview.appendChild(lessonMeta);
       [
         ['導入', q.scenario], ['問い', q.question], ['目標', q.goal],
         ['着目点', q.focus], ['予想', q.prediction], ['検証', q.validation], ['まとめ', q.discovery]
@@ -1580,10 +1694,14 @@
     select.addEventListener('change', renderPreview);
     renderPreview();
     var downloadBtn = $('teacher-quest-download-btn');
+    var audienceSelect = $('teacher-worksheet-audience');
+    function selectedAudience() { return audienceSelect ? audienceSelect.value : 'teacher'; }
     if (downloadBtn) downloadBtn.addEventListener('click', function () {
       var q = sorted.filter(function (item) { return item.id === select.value; })[0];
       if (q) {
-        downloadFile('探究課題-' + q.grade + '-' + q.title + '.md', teacherWorksheet(q), 'text/markdown;charset=utf-8');
+        var audience = selectedAudience();
+        downloadFile('探究課題-' + q.grade + '-' + q.title + '-' + audience + '.md',
+          teacherWorksheet(q, audience), 'text/markdown;charset=utf-8');
         $('teacher-quest-status').textContent = q.title + ' のワークシートをダウンロードしました。';
       }
     });
@@ -1591,12 +1709,13 @@
     if (printBtn) printBtn.addEventListener('click', function () {
       var q = sorted.filter(function (item) { return item.id === select.value; })[0];
       if (!q) return;
+      var audience = selectedAudience();
       var printWindow = window.open('', '_blank');
       if (!printWindow) {
         $('teacher-quest-status').textContent = '印刷画面を開けませんでした。ブラウザのポップアップ許可を確認してください。';
         return;
       }
-      var html = teacherWorksheet(q).split('\n').map(function (line) {
+      var html = teacherWorksheet(q, audience).split('\n').map(function (line) {
         if (line.indexOf('# ') === 0) return '<h1>' + esc(line.slice(2)) + '</h1>';
         if (line.indexOf('## ') === 0) return '<h2>' + esc(line.slice(3)) + '</h2>';
         if (/^\d+\.\s/.test(line)) return '<p class="step">' + esc(line) + '</p>';
@@ -1608,8 +1727,99 @@
         esc(q.title) + '</title><style>body{font:16px/1.7 sans-serif;max-width:800px;margin:32px auto;padding:0 24px;color:#172033}h1{font-size:24px;border-bottom:2px solid #2563eb}h2{font-size:18px;margin:22px 0 6px}.step{margin:4px 0}@media print{body{margin:12mm;max-width:none}}</style><body>' +
         html + '<script>window.onload=function(){window.print()}<\/script></body></html>');
       printWindow.document.close();
-      $('teacher-quest-status').textContent = q.title + ' の印刷画面を開きました。';
+      $('teacher-quest-status').textContent = q.title + ' の' + (audience === 'learner' ? '学習者用' : '教師用') + '印刷画面を開きました。';
     });
+    var lessonSet = [];
+    try {
+      var savedSet = JSON.parse(localStorage.getItem(LESSON_SET_STORE_KEY) || '[]');
+      if (Array.isArray(savedSet)) lessonSet = savedSet.filter(function (id, index) {
+        return typeof id === 'string' && sorted.some(function (q) { return q.id === id; }) && savedSet.indexOf(id) === index;
+      });
+    } catch (_) { lessonSet = []; }
+    function setStatus(message) {
+      var status = $('teacher-quest-status');
+      if (status) status.textContent = message;
+    }
+    function renderLessonSet() {
+      var box = $('teacher-lesson-items'), estimate = $('teacher-lesson-estimate');
+      if (!box || !estimate) return;
+      box.innerHTML = '';
+      var selected = lessonSet.map(function (id) {
+        return sorted.filter(function (q) { return q.id === id; })[0];
+      }).filter(Boolean);
+      var minutes = selected.reduce(function (sum, q) { return sum + (q.lessonMinutes || 20); }, 0);
+      estimate.textContent = selected.length + '課題・想定合計 ' + minutes + '分（1課題の想定時間を合算）';
+      selected.forEach(function (q) {
+        var item = document.createElement('span');
+        item.className = 'teacher-lesson-chip';
+        var title = document.createElement('span');
+        title.textContent = q.grade + '・' + q.title;
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.setAttribute('aria-label', q.title + 'を授業セットから削除');
+        remove.textContent = '×';
+        remove.addEventListener('click', function () {
+          lessonSet = lessonSet.filter(function (id) { return id !== q.id; });
+          renderLessonSet();
+        });
+        item.appendChild(title);
+        item.appendChild(remove);
+        box.appendChild(item);
+      });
+    }
+    var addLesson = $('teacher-lesson-add-btn');
+    if (addLesson) addLesson.addEventListener('click', function () {
+      if (lessonSet.indexOf(select.value) < 0) lessonSet.push(select.value);
+      renderLessonSet();
+      setStatus('選択課題を授業セットに追加しました。');
+    });
+    var saveLesson = $('teacher-lesson-save-btn');
+    if (saveLesson) saveLesson.addEventListener('click', function () {
+      try {
+        localStorage.setItem(LESSON_SET_STORE_KEY, JSON.stringify(lessonSet));
+        setStatus('授業セット' + (lessonSet.length ? 'をこのブラウザに保存しました。' : 'を空の状態で保存しました。'));
+      } catch (err) { setStatus('授業セットを保存できませんでした: ' + err.message); }
+    });
+    var clearLesson = $('teacher-lesson-clear-btn');
+    if (clearLesson) clearLesson.addEventListener('click', function () {
+      if (lessonSet.length && !window.confirm('授業セットの課題をすべて外しますか？')) return;
+      lessonSet = [];
+      renderLessonSet();
+    });
+    function lessonSetMarkdown(audience) {
+      var chosen = lessonSet.map(function (id) {
+        return sorted.filter(function (q) { return q.id === id; })[0];
+      }).filter(Boolean);
+      return chosen.map(function (q, index) {
+        return '# 授業セット ' + (index + 1) + ' / ' + chosen.length + '\n\n' + teacherWorksheet(q, audience);
+      }).join('\n\n---\n\n');
+    }
+    var printSet = $('teacher-lesson-print-btn');
+    if (printSet) printSet.addEventListener('click', function () {
+      if (!lessonSet.length) { setStatus('印刷する課題を授業セットに追加してください。'); return; }
+      var printWindow = window.open('', '_blank');
+      if (!printWindow) { setStatus('印刷画面を開けませんでした。ポップアップ許可を確認してください。'); return; }
+      var audience = selectedAudience();
+      var html = lessonSetMarkdown(audience).split('\n').map(function (line) {
+        if (line.indexOf('# ') === 0) return '<h1>' + esc(line.slice(2)) + '</h1>';
+        if (line.indexOf('## ') === 0) return '<h2>' + esc(line.slice(3)) + '</h2>';
+        if (/^\d+\.\s/.test(line)) return '<p>' + esc(line) + '</p>';
+        return line ? '<p>' + esc(line) + '</p>' : '';
+      }).join('');
+      printWindow.document.open();
+      printWindow.document.write('<!doctype html><html lang="ja"><meta charset="utf-8"><title>授業セット</title><style>body{font:16px/1.7 sans-serif;margin:24px;color:#172033}h1{border-bottom:2px solid #2563eb}h2{margin-top:22px}.page{page-break-after:always}</style><body>' +
+        html + '<script>window.onload=function(){window.print()}<\/script></body></html>');
+      printWindow.document.close();
+      setStatus('授業セットの印刷画面を開きました。');
+    });
+    var downloadSet = $('teacher-lesson-download-btn');
+    if (downloadSet) downloadSet.addEventListener('click', function () {
+      if (!lessonSet.length) { setStatus('保存する課題を授業セットに追加してください。'); return; }
+      var audience = selectedAudience();
+      downloadFile('図形探究-授業セット-' + audience + '.md', lessonSetMarkdown(audience), 'text/markdown;charset=utf-8');
+      setStatus('授業セットをMarkdownで保存しました。');
+    });
+    renderLessonSet();
     var openBtn = $('teacher-quest-open-btn');
     if (openBtn) openBtn.addEventListener('click', function () {
       var q = sorted.filter(function (item) { return item.id === select.value; })[0];
@@ -1631,6 +1841,7 @@
   function initQuests() {
     if (!window.QUESTS) return;
     initTeacherQuestLibrary();
+    window.addEventListener('pagehide', saveQuestDraft);
     document.querySelectorAll('[data-quest-level]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         questFilter = btn.getAttribute('data-quest-level');
@@ -1658,6 +1869,8 @@
     renderQuestList();
     var back = $('quest-back-btn');
     if (back) back.addEventListener('click', function () {
+      if (questDraftTimer) clearTimeout(questDraftTimer);
+      saveQuestDraft();
       activeQuest = null;
       $('quest-active').classList.add('hidden');
     });
@@ -1674,14 +1887,49 @@
         addChatMessage('💡 ヒントは以上です。あとは自分で試してみよう！', 'ai');
       }
     });
-    var starterBtn = $('quest-starter-btn');
-    if (starterBtn) starterBtn.addEventListener('click', function () {
-      if (!activeQuest || !activeQuest.starter) return;
+    function startQuestWithVariant(mode) {
+      if (!activeQuest) return;
+      var variants = activeQuest.starterVariants || { guided: activeQuest.starter, blank: null };
+      if (mode === 'counterexample' && !variants.counterexample) return;
       var stats = window.ConstructionBoard.stats();
       var hasContent = Object.keys(stats).some(function (key) { return stats[key] > 0; });
-      if (hasContent && !window.confirm('お手本を配置すると、現在の作図内容は置き換わります。続けますか？')) return;
-      window.ConstructionBoard.load(JSON.parse(JSON.stringify(activeQuest.starter)));
-      addChatMessage('🧩 お手本の土台を配置しました。続きを作図してみよう！', 'ai');
+      var prompts = {
+        guided: '手がかり付きの作図を配置すると、現在の作図内容は置き換わります。続けますか？',
+        counterexample: '反例を配置すると、現在の作図内容は置き換わります。続けますか？',
+        blank: '白紙から始めるため、現在の作図内容を消去します。続けますか？'
+      };
+      if (hasContent && !window.confirm(prompts[mode])) return;
+      if (mode === 'blank') window.ConstructionBoard.load(null);
+      else window.ConstructionBoard.load(JSON.parse(JSON.stringify(variants[mode])));
+      addChatMessage(mode === 'guided' ? '🧩 手がかり付きの土台を配置しました。続きを作図してみよう！' :
+        mode === 'counterexample' ? '🔎 性質が成り立たない例を配置しました。どの条件が違うか調べよう！' :
+          '▫️ 白紙の作図キャンバスを用意しました。自分で図を作ってみよう！', 'ai');
+      scheduleQuestDraftSave();
+    }
+    ['guided', 'counterexample', 'blank'].forEach(function (mode) {
+      var button = $('quest-starter-' + mode + '-btn');
+      if (button) button.addEventListener('click', function () { startQuestWithVariant(mode); });
+    });
+    var resumeDraft = $('quest-resume-btn');
+    if (resumeDraft) resumeDraft.addEventListener('click', function () {
+      if (!activeQuest) return;
+      var draft = readQuestDraft(activeQuest.id);
+      if (!draft || !draft.construction) return;
+      var stats = window.ConstructionBoard.stats();
+      var hasContent = Object.keys(stats).some(function (key) { return stats[key] > 0; });
+      if (hasContent && !window.confirm('保存した下書きで現在の作図を置き換えて再開しますか？')) return;
+      window.ConstructionBoard.load(draft.construction);
+      questStepDone = activeQuest.steps.map(function (_, index) { return !!(draft.steps && draft.steps[index]); });
+      document.querySelectorAll('.quest-step').forEach(function (button, index) {
+        button.classList.toggle('quest-step-done', questStepDone[index]);
+        button.setAttribute('aria-pressed', String(questStepDone[index]));
+      });
+      if ($('quest-reflection-input')) $('quest-reflection-input').value = String(draft.reflection || '');
+      if ($('journal-prediction-input')) $('journal-prediction-input').value = String(draft.prediction || '');
+      questHintIdx = Math.max(0, Math.min(activeQuest.hints.length, Number(draft.hintIndex) || 0));
+      var status = $('quest-draft-status');
+      if (status) status.textContent = '保存した下書きを再開しました。続きの作図に取り組めます。';
+      addChatMessage('↻ 保存した課題の作図と記録を再開しました。', 'ai');
     });
     var startBtn = $('quest-start-btn');
     if (startBtn) startBtn.addEventListener('click', function () {
@@ -1792,6 +2040,7 @@
         var arr = loadJournal();
         arr.push({
           time: new Date().toLocaleString('ja-JP'),
+          createdAt: new Date().toISOString(),
           prediction: '【課題】' + activeQuest.title + '：' + activeQuest.prediction,
           checks: verdicts.map(function (v) { return { name: v.label, passed: v.ok }; }),
           comment: results[1] ? results[1].report_md.slice(0, 500) : activeQuest.discovery,

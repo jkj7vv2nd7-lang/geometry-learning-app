@@ -274,6 +274,7 @@
             <div class="flex flex-wrap gap-2" aria-label="記録帳の保存と復元">
               <button id="journal-export-json-btn" type="button" class="tool-btn">⬇️ 記録をJSON保存</button>
               <button id="journal-export-csv-btn" type="button" class="tool-btn">⬇️ 記録をCSV保存</button>
+              <button id="journal-export-portfolio-btn" type="button" class="tool-btn">🔒 匿名ポートフォリオ</button>
               <button id="journal-import-btn" type="button" class="tool-btn">⬆️ JSONから復元</button>
               <input id="journal-import-input" type="file" accept="application/json,.json" class="hidden" />
             </div>
@@ -323,11 +324,15 @@
               <div class="flex flex-wrap gap-2">
                 <button id="quest-start-btn" type="button" class="tool-btn verify-btn" title="作図キャンバスへ移動して課題を試す">✏️ 作図キャンバスで試す</button>
                 <button id="quest-prediction-btn" type="button" class="tool-btn" title="予想を記録帳の入力欄へ送る">📓 予想を記録帳へ</button>
-                <button id="quest-starter-btn" type="button" class="tool-btn hidden" title="お手本の土台を作図に配置">🧩 お手本を配置</button>
+                <button id="quest-starter-guided-btn" type="button" class="tool-btn" title="手がかり付きの作図例を配置">🧩 手がかり付きで開始</button>
+                <button id="quest-starter-counterexample-btn" type="button" class="tool-btn hidden" title="性質を満たさない例を配置して比べる">🔎 反例から開始</button>
+                <button id="quest-starter-blank-btn" type="button" class="tool-btn" title="空の作図キャンバスで開始">▫️ 白紙から開始</button>
+                <button id="quest-resume-btn" type="button" class="tool-btn hidden">↻ 保存した下書きを再開</button>
                 <button id="quest-hint-btn" type="button" class="tool-btn" title="ヒントを1つ見る">💡 ヒント</button>
                 <button id="quest-check-btn" type="button" class="tool-btn verify-btn" title="作図が課題を満たすか自動判定">🏁 できた！チェック</button>
               </div>
-              <p class="text-xs text-slate-600">チェックは作図の要素数と探究手順の記録です。性質の理解・証明を自動判定するものではありません。発見したことと根拠も記録しましょう。</p>
+              <p id="quest-draft-status" class="text-xs text-slate-600" role="status" aria-live="polite">課題の作図・手順・振り返りはこのブラウザに自動保存されます。</p>
+              <p class="text-xs text-slate-600">チェックは作図の幾何関係と探究手順の記録です。性質の理解・証明を自動判定するものではありません。発見したことと根拠も記録しましょう。</p>
               <div id="quest-hints" class="text-sm space-y-1" aria-live="polite"></div>
               <div id="quest-result" class="text-sm" role="status" aria-live="polite"></div>
             </div>
@@ -374,11 +379,33 @@
           <div class="flex flex-wrap gap-2 items-center">
             <label for="teacher-quest-select" class="text-sm font-bold">課題を選択</label>
             <select id="teacher-quest-select" class="border rounded-xl px-3 py-2 text-sm min-h-[44px]"></select>
+            <label for="teacher-worksheet-audience" class="text-sm font-bold">出力</label>
+            <select id="teacher-worksheet-audience" class="border rounded-xl px-3 py-2 text-sm min-h-[44px]">
+              <option value="learner">学習者用（記入用）</option>
+              <option value="teacher">教師用（指導メモ付き）</option>
+            </select>
             <button id="teacher-quest-download-btn" type="button" class="tool-btn">⬇️ ワークシート保存</button>
             <button id="teacher-quest-print-btn" type="button" class="tool-btn">🖨️ 印刷</button>
             <button id="teacher-quest-open-btn" type="button" class="tool-btn">✏️ 作図で試す</button>
           </div>
           <p id="teacher-quest-status" class="w-full text-xs text-slate-600" role="status" aria-live="polite"></p>
+        </section>
+        <section id="teacher-lesson-set" class="bg-white rounded-2xl shadow p-4" aria-labelledby="teacher-lesson-set-heading">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 id="teacher-lesson-set-heading" class="font-extrabold">🗂 授業セット</h2>
+              <p class="text-xs text-slate-600">複数課題をまとめて保存・印刷できます（このブラウザ内に保存）。</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button id="teacher-lesson-add-btn" type="button" class="tool-btn">＋ 選択課題を追加</button>
+              <button id="teacher-lesson-save-btn" type="button" class="tool-btn">💾 授業セットを保存</button>
+              <button id="teacher-lesson-print-btn" type="button" class="tool-btn">🖨️ セットを印刷</button>
+              <button id="teacher-lesson-download-btn" type="button" class="tool-btn">⬇️ セットを保存</button>
+              <button id="teacher-lesson-clear-btn" type="button" class="tool-btn">空にする</button>
+            </div>
+          </div>
+          <p id="teacher-lesson-estimate" class="text-xs text-slate-600 mt-2"></p>
+          <div id="teacher-lesson-items" class="mt-2 flex flex-wrap gap-2" aria-live="polite"></div>
         </section>
         <section id="teacher-quest-preview" class="bg-white rounded-2xl shadow p-5" aria-live="polite" aria-label="授業用探究課題プレビュー"></section>
         <!-- タブバー -->

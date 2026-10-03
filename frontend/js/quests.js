@@ -566,7 +566,7 @@
     [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']]
   );
   var circle = starter(
-    { O: { x: 400, y: 250 }, A: { x: 280, y: 250 }, B: { x: 520, y: 250 }, C: { x: 360, y: 130 }, D: { x: 440, y: 370 } },
+    { O: { x: 400, y: 250 }, A: { x: 280, y: 250 }, B: { x: 520, y: 250 }, C: { x: 400, y: 130 }, D: { x: 400, y: 370 } },
     [['A', 'B'], ['A', 'C'], ['B', 'C'], ['A', 'D'], ['B', 'D']],
     { circles: [['O', 'A']], angles: [['C', 'A', 'B'], ['D', 'A', 'B'], ['O', 'A', 'B']] }
   );
@@ -608,7 +608,11 @@
       { A: { x: 250, y: 170 }, B: { x: 430, y: 170 }, C: { x: 430, y: 350 }, D: { x: 250, y: 350 }, E: { x: 330, y: 100 }, F: { x: 510, y: 100 }, G: { x: 510, y: 280 }, H: { x: 330, y: 280 } },
       [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['E', 'F'], ['F', 'G'], ['G', 'H'], ['H', 'E'], ['A', 'E'], ['B', 'F'], ['C', 'G'], ['D', 'H']]
     ),
-    'junior2-exterior-angle': triangle,
+    'junior2-exterior-angle': starter(
+    { A: { x: 240, y: 360 }, B: { x: 400, y: 150 }, C: { x: 560, y: 360 }, D: { x: 640, y: 465 } },
+    [['A', 'B'], ['B', 'C'], ['C', 'A'], ['C', 'D']],
+    { angles: [['C', 'A', 'D'], ['A', 'B', 'C'], ['B', 'A', 'C']] }
+    ),
     'junior2-parallelogram': starter(
       { A: { x: 220, y: 180 }, B: { x: 500, y: 180 }, C: { x: 570, y: 350 }, D: { x: 290, y: 350 }, E: { x: 395, y: 265 }, F: { x: 395, y: 265 } },
       [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A'], ['A', 'C'], ['B', 'D']]
@@ -626,8 +630,16 @@
       [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'E'], ['E', 'F'], ['F', 'D']],
       { angles: [['A', 'B', 'C'], ['B', 'A', 'C'], ['C', 'A', 'B'], ['D', 'E', 'F'], ['E', 'D', 'F'], ['F', 'D', 'E']] }
     ),
-    'junior3-parallel-ratio': parallelLines,
-    'junior3-similarity-height': triangle,
+    'junior3-parallel-ratio': starter(
+      { A: { x: 400, y: 100 }, B: { x: 220, y: 400 }, C: { x: 580, y: 400 }, D: { x: 310, y: 250 }, E: { x: 490, y: 250 } },
+      [['A', 'B'], ['A', 'C'], ['B', 'C'], ['D', 'E']],
+      { parallels: [{ seg: ['B', 'C'], p: 'D' }] }
+    ),
+    'junior3-similarity-height': starter(
+      { A: { x: 200, y: 380 }, B: { x: 350, y: 150 }, C: { x: 500, y: 380 }, D: { x: 560, y: 380 }, E: { x: 635, y: 265 }, F: { x: 710, y: 380 } },
+      [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'E'], ['E', 'F'], ['F', 'D']],
+      { angles: [['A', 'B', 'C'], ['B', 'A', 'C'], ['C', 'A', 'B'], ['D', 'E', 'F'], ['E', 'D', 'F'], ['F', 'D', 'E']] }
+    ),
     'junior3-circle-angle': circle,
     'elem-circle': circle,
     'elem-quadrilaterals': quadrilateral,
@@ -641,7 +653,9 @@
       [['A', 'B'], ['B', 'C'], ['C', 'A']],
       { pbis: [['A', 'B'], ['B', 'C']], bisectors: [['A', 'B', 'C'], ['B', 'A', 'C']] }
     ),
-    'high-chord-center': circle,
+    'high-chord-center': starter(circle.points, circle.segments, {
+      circles: circle.circles, angles: circle.angles, pbis: [['C', 'D']]
+    }),
     'high-coordinate-distance': triangle,
     'high-circle-equation': circle,
     'high-trigonometric-ratio': triangle,
@@ -657,12 +671,53 @@
     if (starterByQuest[q.id]) q.starter = JSON.parse(JSON.stringify(starterByQuest[q.id]));
   });
   var locallyVerifiable = {
-    'angle-sum': { kind: 'geometry_triangle_angle_sum' },
-    isosceles: { kind: 'geometry_isosceles_base_angles' },
-    pythagoras: { kind: 'geometry_pythagorean' },
-    thales: { kind: 'geometry_thales_right_angle' }
+    'angle-sum': ['geometry_triangle_angle_sum'],
+    isosceles: ['geometry_isosceles_base_angles'],
+    'parallel-angles': ['geometry_parallel_lines'],
+    pythagoras: ['geometry_pythagorean'],
+    thales: ['geometry_thales_right_angle'],
+    'junior1-pbis-locus': ['geometry_perpendicular_bisector_locus'],
+    'junior1-angle-bisector-locus': ['geometry_angle_bisector_locus'],
+    'junior1-circle-tangent': ['geometry_tangent_radius'],
+    'junior2-exterior-angle': ['geometry_triangle_exterior_angle'],
+    'junior2-parallelogram': ['geometry_parallelogram'],
+    'junior2-congruence': ['geometry_congruent_triangles'],
+    'junior3-similarity': ['geometry_similar_triangles'],
+    'junior3-parallel-ratio': ['geometry_parallel_side_ratio'],
+    'junior3-similarity-height': ['geometry_similar_triangles'],
+    'junior3-circle-angle': ['geometry_inscribed_angle'],
+    'high-chord-center': ['geometry_circle_chord_bisector']
   };
   global.QUESTS.forEach(function (q) {
-    if (locallyVerifiable[q.id]) q.checks = [locallyVerifiable[q.id]];
+    if (locallyVerifiable[q.id]) {
+      q.checks = locallyVerifiable[q.id].map(function (kind) { return { kind: kind }; });
+    }
+    q.starterVariants = {
+      guided: JSON.parse(JSON.stringify(q.starter)),
+      blank: null,
+      counterexample: null
+    };
+  });
+  var counterexamples = {
+    isosceles: function (data) { data.points.C.x += 45; return data; },
+    'parallel-angles': function (data) { data.parallels = []; return data; },
+    pythagoras: function (data) { data.points.B.x += 45; return data; },
+    thales: function (data) { data.points.Z.y += 35; return data; },
+    'junior1-pbis-locus': function (data) { data.points.C.x += 55; data.points.D.x += 55; return data; },
+    'junior1-angle-bisector-locus': function (data) { data.points.D.x += 45; return data; },
+    'junior1-circle-tangent': function (data) { data.tangents = []; return data; },
+    'junior2-exterior-angle': function (data) { data.points.D.y += 30; return data; },
+    'junior2-parallelogram': function (data) { data.points.C.x += 55; return data; },
+    'junior2-congruence': function (data) { data.points.F.x += 55; return data; },
+    'junior3-similarity': function (data) { data.points.F.x += 50; return data; },
+    'junior3-parallel-ratio': function (data) { data.points.E.x += 45; return data; },
+    'junior3-similarity-height': function (data) { data.points.C.x += 55; return data; },
+    'junior3-circle-angle': function (data) { data.points.C.y += 35; data.points.D.y += 35; return data; },
+    'high-chord-center': function (data) { data.points.O.x += 55; return data; }
+  };
+  global.QUESTS.forEach(function (q) {
+    if (counterexamples[q.id]) {
+      q.starterVariants.counterexample = counterexamples[q.id](JSON.parse(JSON.stringify(q.starter)));
+    }
   });
 })(window);

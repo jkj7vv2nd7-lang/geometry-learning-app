@@ -22,3 +22,8 @@ Thumbs.db
 # 一時ファイル・ログ
 *.log
 *.tmp
+
+# Browser regression artifacts and local Node dependencies
+node_modules/
+test-results/
+playwright-report/
