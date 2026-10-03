@@ -4,16 +4,104 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    const style = document.createElement('style');
-    style.textContent = '.hidden{display:none!important}';
-    document.documentElement.appendChild(style);
+  await page.route('**/*', (route) => {
+    const requestUrl = new URL(route.request().url());
+    if (requestUrl.protocol.startsWith('http') &&
+        requestUrl.hostname !== '127.0.0.1' &&
+        requestUrl.hostname !== 'localhost') {
+      return route.abort();
+    }
+    return route.continue();
   });
-  await page.route('https://cdn.tailwindcss.com', (route) =>
-    route.fulfill({ contentType: 'application/javascript', body: 'window.tailwind = { config: {} };' }));
   await page.route('**/js/solid.js', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: 'export {};'}));
-  await page.route('https://cdn.jsdelivr.net/**', (route) => route.abort());
+});
+
+test('local CSS, math rendering, and vendor assets work without external network access', async ({ page }) => {
+  const externalRequests = [];
+  const pageErrors = [];
+  const failedRequests = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('requestfailed', (request) => failedRequests.push({ url: request.url(), error: request.failure()?.errorText }));
+  page.on('request', (request) => {
+    const requestUrl = new URL(request.url());
+    if (requestUrl.protocol.startsWith('http') &&
+        requestUrl.hostname !== '127.0.0.1' &&
+        requestUrl.hostname !== 'localhost') {
+      externalRequests.push(request.url());
+    }
+  });
+  await page.goto('/');
+  const readiness = await page.evaluate(() => ({
+    katex: Boolean(window.katex),
+    board: Boolean(window.ConstructionBoard),
+    styleSheets: Array.from(document.styleSheets).map((sheet) => sheet.href)
+  }));
+  expect(readiness, JSON.stringify({ readiness, pageErrors, failedRequests })).toMatchObject({ katex: true, board: true });
+  await expect(page.locator('#teacher-view')).toHaveCSS('display', 'none');
+  const vendorResponseStatuses = await page.evaluate(async () => {
+    const paths = [
+      'css/tailwind.generated.css',
+      'vendor/katex/katex.min.css',
+      'vendor/katex/fonts/KaTeX_Main-Regular.woff2',
+      'vendor/three.module.min.js'
+    ];
+    return Promise.all(paths.map(async (path) => (await fetch(path)).status));
+  });
+  expect(vendorResponseStatuses).toEqual([200, 200, 200, 200]);
+  const threeModuleLoaded = await page.evaluate(async () =>
+    Boolean((await import('/vendor/three.module.min.js')).Scene));
+  expect(threeModuleLoaded).toBe(true);
+  const mathMarkupRendered = await page.evaluate(() => {
+    const output = document.createElement('span');
+    window.katex.render('\\frac{1}{2}', output, { throwOnError: true });
+    return Boolean(output.querySelector('.katex'));
+  });
+  expect(mathMarkupRendered).toBe(true);
+  expect(externalRequests).toEqual([]);
+});
+
+test('submission reports export one selected record with only explicitly selected personal content', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('journal-v1', JSON.stringify([{
+    time: '2026/10/04 10:00',
+    createdAt: '2026-10-04T01:00:00.000Z',
+    prediction: '予想-SENSITIVE',
+    checks: [{ name: '作図の条件', passed: true }],
+    comment: '',
+    questId: 'junior-triangle',
+    questTitle: '三角形の探究',
+    reflection: '振り返り-SENSITIVE',
+    construction: { points: { A: { x: 20, y: 40 } }, segments: [['A', 'B']] }
+  }])));
+  await page.reload();
+  await page.locator('#journal-export-report-btn').click();
+  await expect(page.locator('#journal-report-dialog')).toBeVisible();
+  await expect(page.locator('#journal-report-name')).toBeDisabled();
+  await page.locator('#journal-report-include-prediction').uncheck();
+  await page.locator('#journal-report-include-reflection').uncheck();
+  const [anonymousDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#journal-report-download').click()
+  ]);
+  const anonymousReport = JSON.parse(await fs.readFile(await anonymousDownload.path(), 'utf8'));
+  expect(anonymousReport.task.title).toBe('三角形の探究');
+  expect(anonymousReport.checks).toEqual([{ name: '作図の条件', passed: true }]);
+  expect(anonymousReport.construction.points.A).toEqual({ x: 20, y: 40 });
+  expect(anonymousReport).not.toHaveProperty('studentName');
+  expect(anonymousReport).not.toHaveProperty('prediction');
+  expect(anonymousReport).not.toHaveProperty('reflection');
+  expect(JSON.stringify(anonymousReport)).not.toContain('SENSITIVE');
+
+  await page.locator('#journal-export-report-btn').click();
+  await page.locator('#journal-report-include-name').check();
+  await page.locator('#journal-report-name').fill('山田 花子');
+  const [namedDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#journal-report-download').click()
+  ]);
+  const namedReport = JSON.parse(await fs.readFile(await namedDownload.path(), 'utf8'));
+  expect(namedReport.studentName).toBe('山田 花子');
 });
 
 test('filters quests by stage, grade, and unit', async ({ page }) => {
@@ -24,6 +112,70 @@ test('filters quests by stage, grade, and unit', async ({ page }) => {
   await page.locator('#quest-unit-filter').selectOption('円');
   await expect(page.locator('#quest-list .quest-card')).toHaveCount(1);
   await expect(page.locator('#quest-list')).toContainText('半円の角のふしぎ');
+});
+
+test('keyboard users can navigate modes, move between teacher tabs, and place points', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#mode-tabs')).toHaveAttribute('role', 'tablist');
+  await page.locator('.skip-link').focus();
+  await expect(page.locator('.skip-link')).toBeFocused();
+  const toolbarToggle = page.locator('#construct-tools-toggle');
+  await toolbarToggle.click();
+  await expect(toolbarToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(toolbarToggle).toHaveAttribute('aria-label', '作図ツールを表示');
+  await expect(page.locator('#construct-toolbar')).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.locator('#construct-toolbar')).toHaveAttribute('inert', '');
+  await toolbarToggle.click();
+  await expect(toolbarToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(toolbarToggle).toHaveAttribute('aria-label', '作図ツールを隠す');
+  await expect(page.locator('#construct-toolbar')).toHaveAttribute('aria-hidden', 'false');
+  await expect(page.locator('#tool-select')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#mode-student-btn').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#mode-teacher-btn')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#teacher-view')).toHaveAttribute('aria-hidden', 'false');
+
+  await page.locator('#tab-lesson-plan').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#tab-print-figure')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#panel-print-figure')).toHaveAttribute('aria-hidden', 'false');
+
+  await page.locator('#mode-student-btn').click();
+  await page.locator('#geometry-canvas').focus();
+  await page.keyboard.press('p');
+  await expect(page.locator('#tool-point')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#canvas-keyboard-status')).toContainText('x 420');
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(page.locator('#canvas-keyboard-status')).toContainText('x 425');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.ConstructionBoard.stats().points)).toBe(1);
+  await expect(page.locator('#canvas-keyboard-status')).toContainText('Enterを押します');
+});
+
+test('tablet and phone layouts keep inquiry and drawing controls within the viewport', async ({ page }) => {
+  for (const viewport of [{ width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    await page.getByRole('button', { name: '中学校', exact: true }).click();
+    await page.locator('#quest-grade-filter').selectOption('中学校1年');
+    await page.locator('#quest-list .quest-card').first().focus();
+    const dimensions = await page.evaluate(() => ({
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      overflowing: Array.from(document.querySelectorAll('body *')).filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && (rect.left < 0 || rect.right > window.innerWidth + 1);
+      }).map((element) => {
+        const parent = element.parentElement;
+        return { id: element.id, className: String(element.className).slice(0, 100), right: Math.round(element.getBoundingClientRect().right), parent: parent && { id: parent.id, className: parent.className, display: getComputedStyle(parent).display } };
+      }).slice(0, 10),
+      toolbarButtons: Array.from(document.querySelectorAll('#construct-toolbar .construct-tool')).map((button) =>
+        Math.min(button.getBoundingClientRect().width, button.getBoundingClientRect().height))
+    }));
+    expect(dimensions.pageWidth, JSON.stringify(dimensions)).toBeLessThanOrEqual(dimensions.viewportWidth);
+    expect(dimensions.toolbarButtons.every((size) => size >= 44)).toBe(true);
+  }
 });
 
 test('guided, counterexample, blank, and saved-draft quest paths work', async ({ page }) => {
@@ -75,6 +227,8 @@ test('teacher lesson sets save and export learner worksheets', async ({ page }) 
   await page.locator('#teacher-quest-select').selectOption('junior3-similarity');
   await page.locator('#teacher-lesson-add-btn').click();
   await expect(page.locator('#teacher-lesson-items .teacher-lesson-chip')).toHaveCount(2);
+  await expect(page.locator('#teacher-lesson-estimate')).toContainText('合計 100分');
+  await expect(page.locator('#teacher-quest-preview')).toContainText('予想されるつまずき');
   await page.locator('#teacher-lesson-save-btn').click();
   await expect.poll(() => page.evaluate(() => localStorage.getItem('teacher-lesson-set-v1')))
     .toBe('["junior2-congruence","junior3-similarity"]');
@@ -91,6 +245,9 @@ test('teacher lesson sets save and export learner worksheets', async ({ page }) 
   const teacherDownload = await teacherDownloadPromise;
   const teacherWorksheet = await fs.readFile(await teacherDownload.path(), 'utf8');
   expect(teacherWorksheet).toContain('観点別評価メモ');
+  expect(teacherWorksheet).toContain('## 授業の流れ');
+  expect(teacherWorksheet).toContain('## 発問例');
+  expect(teacherWorksheet).toContain('## 予想されるつまずき');
   const printPromise = page.waitForEvent('popup');
   await page.locator('#teacher-lesson-print-btn').click();
   const printPage = await printPromise;

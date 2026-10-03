@@ -36,6 +36,12 @@ test('catalog entries are complete, unique, and categorized for all school stage
     for (const key of required) assert.ok(quest[key], `${quest.id} missing ${key}`);
     assert.ok(quest.steps.length > 0, `${quest.id} missing steps`);
     assert.ok(quest.starter, `${quest.id} missing a usable starter`);
+    assert.ok(quest.lessonPlan, `${quest.id} missing lesson preparation`);
+    assert.equal(quest.lessonPlan.phases.reduce((sum, phase) => sum + phase.minutes, 0),
+      quest.lessonPlan.durationMinutes, `${quest.id} lesson phases don't add up`);
+    assert.ok(quest.lessonPlan.teacherPrompts.length > 0, `${quest.id} missing teacher prompts`);
+    assert.ok(quest.lessonPlan.commonMisconceptions.length > 0, `${quest.id} missing anticipated misconceptions`);
+    assert.ok(quest.lessonPlan.reflectionPrompts.length > 0, `${quest.id} missing reflection prompts`);
     assert.ok(quest.grade.startsWith(quest.level === 'elem' ? '小学校' : quest.level === 'junior' ? '中学校' : '高校'));
     assert.ok(quest.checks.every((check) => check.kind.startsWith('min_') ||
       check.kind.startsWith('geometry_') || ['has_check', 'has_theorem'].includes(check.kind)), `${quest.id} has an unknown check`);
@@ -162,13 +168,27 @@ test('unknown and server-only geometry requirements never pass locally', () => {
   assert.equal(check('has_theorem', { points: {} })[0].ok, false);
 });
 
+test('every quest declares an explicit supported check scope', () => {
+  for (const quest of quests) {
+    const scope = validation.describeChecks(quest.checks);
+    assert.equal(scope.unsupported, 0, `${quest.id} has unsupported checks`);
+    assert.equal(scope.localGeometry + scope.activityEvidence + scope.serverVerification, quest.checks.length);
+  }
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(validation.describeChecks([{ kind: 'geometry_unknown' }, { kind: 'min_points', n: 3 }]))),
+    { localGeometry: 0, activityEvidence: 1, serverVerification: 0, unsupported: 1 }
+  );
+});
+
 test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and journal backups', () => {
   const html = fs.readFileSync(path.join(root, 'frontend/index.html'), 'utf8');
   for (const id of ['quest-grade-filter', 'quest-unit-filter', 'quest-reflection-input', 'teacher-quest-select',
     'teacher-quest-download-btn', 'teacher-quest-print-btn', 'journal-export-json-btn', 'journal-export-csv-btn',
-    'journal-import-input', 'quest-starter-guided-btn', 'quest-starter-counterexample-btn', 'quest-starter-blank-btn',
+    'journal-import-input', 'quest-check-scope', 'quest-starter-guided-btn', 'quest-starter-counterexample-btn', 'quest-starter-blank-btn',
     'quest-resume-btn', 'teacher-lesson-add-btn', 'teacher-lesson-print-btn', 'teacher-worksheet-audience',
-    'journal-export-portfolio-btn']) {
+    'journal-export-portfolio-btn', 'journal-export-report-btn', 'journal-report-dialog',
+    'journal-report-entry', 'journal-report-include-name', 'journal-report-name',
+    'journal-report-include-construction']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /data-quest-level="all" aria-pressed="true"/);
@@ -176,6 +196,10 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
   assert.match(html, /id="quest-result"[^>]*role="status"/);
   assert.match(html, /for="teacher-quest-select"/);
   assert.match(html, /id="journal-export-status"[^>]*role="status"/);
+  assert.match(html, /id="journal-report-name"[^>]*disabled/);
+  assert.doesNotMatch(html, /cdn\.tailwindcss\.com|cdn\.jsdelivr\.net|unpkg\.com/);
+  assert.match(html, /vendor\/katex\/katex\.min\.css/);
+  assert.match(html, /vendor\/three\.module\.min\.js/);
   assert.ok(html.indexOf('js/quests.js') < html.indexOf('js/quest-validation.js'));
   assert.ok(html.indexOf('js/quest-validation.js') < html.indexOf('js/app.js'));
   const app = fs.readFileSync(path.join(root, 'frontend/js/app.js'), 'utf8');
@@ -183,5 +207,6 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
   assert.match(app, /if \(!reflection\)/);
   assert.match(app, /JSON\.parse\(String\(reader\.result/);
   assert.match(app, /氏名・予想・振り返り・自由記述は含みません/);
+  assert.match(app, /construction: window\.ConstructionBoard \? window\.ConstructionBoard\.serialize\(\{ traces: true \}\)/);
   assert.match(app, /function scheduleQuestDraftSave/);
 });

@@ -3,10 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "build:css": "tailwindcss -i frontend/css/tailwind.input.css -o frontend/css/tailwind.generated.css --minify",
+    "copy:vendor": "node scripts/copy-vendor-assets.js",
+    "build": "npm run copy:vendor && npm run build:css",
     "test:unit": "node --test tests/quest-validation.test.js",
     "test:browser": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/cli": "4.3.0",
+    "katex": "^0.16.11",
+    "tailwindcss": "4.3.0",
+    "three": "^0.160.0"
   }
 }

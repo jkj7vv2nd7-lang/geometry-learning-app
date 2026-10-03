@@ -4,27 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>インタラクティブ図形学習支援ツール</title>
-  <!-- Tailwind CSS (CDN) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            student: { 50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
-            teacher: { 50:'#f0fdf4', 100:'#dcfce7', 500:'#22c55e', 600:'#16a34a', 700:'#15803d' }
-          }
-        }
-      }
-    };
-  </script>
+  <!-- Tailwind CSS (ローカルビルド。実行時のCDN通信は不要) -->
+  <link rel="stylesheet" href="css/tailwind.generated.css" />
   <!-- 独自スタイル -->
   <link rel="stylesheet" href="css/style.css" />
-  <!-- KaTeX（数式の教科書体表示） -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
+  <!-- KaTeX（数式の教科書体表示・ローカル配信） -->
+  <link rel="stylesheet" href="vendor/katex/katex.min.css" />
 </head>
 <body data-mode="student" class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
+  <a class="skip-link" href="#main-display-area">主な内容へ移動</a>
   <!-- ==================== ヘッダー ==================== -->
   <header id="app-header" class="mode-header w-full px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md sticky top-0 z-30">
     <div class="flex items-center gap-3">
@@ -40,11 +29,13 @@
       <button id="toggle-panel-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="左の入力パネルを表示／隠す">📋 入力欄</button>
       <button id="header-solid-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="立体図形（3D）の表示／非表示" aria-pressed="false">🧊 立体</button>
       <button id="float-panels-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="解説・履歴・記録帳をフローティング表示／元の位置に戻す" aria-pressed="false">🪟 フロート</button>
+      <div id="mode-tabs" role="tablist" aria-label="利用モード" class="flex items-center gap-1">
       <button
         id="mode-student-btn"
         type="button"
         role="tab"
         aria-selected="true"
+        aria-controls="student-view"
         data-mode-target="student"
         class="mode-tab-btn mode-tab-active px-5 py-2 rounded-full font-bold text-sm min-h-[44px] transition">
         🎒 児童・生徒モード
@@ -54,10 +45,12 @@
         type="button"
         role="tab"
         aria-selected="false"
+        aria-controls="teacher-view"
         data-mode-target="teacher"
         class="mode-tab-btn px-5 py-2 rounded-full font-bold text-sm min-h-[44px] transition">
         🍎 教師モード
       </button>
+      </div>
     </nav>
   </header>
 
@@ -147,7 +140,7 @@
     <main id="main-display-area" class="flex flex-col gap-4 min-w-0">
 
       <!-- ===== 児童・生徒モード表示 ===== -->
-      <div id="student-view" role="tabpanel" aria-labelledby="mode-student-btn" class="flex flex-col gap-4">
+      <div id="student-view" role="tabpanel" aria-labelledby="mode-student-btn" aria-hidden="false" tabindex="0" class="flex flex-col gap-4">
         <!-- 図形キャンバス -->
         <section id="canvas-section" aria-labelledby="canvas-heading" class="bg-white rounded-2xl shadow overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
@@ -162,7 +155,7 @@
 
           <div id="canvas-container" class="relative w-full bg-grid">
             <!-- 作図ツールバー（キャンバス上のフローティング表示） -->
-            <button id="construct-tools-toggle" type="button" title="作図ツールを表示／隠す">🛠</button>
+            <button id="construct-tools-toggle" type="button" title="作図ツールを表示／隠す" aria-label="作図ツールを隠す" aria-expanded="true" aria-controls="construct-toolbar">🛠</button>
             <div id="construct-toolbar" class="flex flex-wrap items-center gap-1.5 px-3 py-2" role="toolbar" aria-label="作図ツール">
               <span id="construct-grip" title="ドラッグで移動・ダブルクリックで元の位置に戻す">⠿</span>
               <button id="construct-layout-btn" type="button" title="バーの形を変える（横長→正方形→縦長→ダイヤル）">◫</button>
@@ -192,7 +185,7 @@
               <button id="discover-btn" type="button" class="tool-btn verify-btn" title="作図から定理を自動発見する">📜 定理レポート</button>
             </div>
             <!-- 将来：GeoGebra風ドラッグ操作はこのSVG上の点・線要素 (.draggable-point / .draggable-line) にバインド -->
-            <svg id="geometry-canvas" viewBox="0 0 800 500" class="w-full h-auto block touch-none select-none" role="img" aria-label="生成された図形">
+            <svg id="geometry-canvas" viewBox="0 0 800 500" class="w-full h-auto block touch-none select-none" role="application" tabindex="0" aria-labelledby="canvas-heading" aria-describedby="canvas-keyboard-help" aria-label="作図キャンバス。矢印キーでカーソルを移動し、Enterで選択した作図ツールを実行します。">
               <defs>
                 <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
                   <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="1"/>
@@ -205,6 +198,7 @@
               <g id="graph-layer"><!-- 関数グラフの曲線・零点 --></g>
               <g id="construct-layer"><!-- 作図モードの図形（window.ConstructionBoardが管理） --></g>
               <g id="construct-measure-layer"><!-- 作図の計測ラベル --></g>
+              <g id="keyboard-cursor-layer" aria-hidden="true"></g>
               <text id="canvas-placeholder" x="400" y="250" text-anchor="middle" fill="#94a3b8" font-size="20">
                 左の入力欄から「図形を生成・探求する」を押してね！
               </text>
@@ -214,7 +208,8 @@
               📏 辺AB: — ｜ 辺BC: — ｜ ∠B: — ｜ 面積: —
             </div>
           </div>
-          <p class="text-xs text-slate-500 px-4 py-2">💡 ヒント：ツールバーの「● 点」「📏 線分」「⭕ 円」で<strong>自分で作図</strong>できるよ！キーボードも使えます（V選択・P点・S線分・L直線・C円・T垂線・R平行・E中点垂線・G接線・B二等分・A角度・D削除・Esc選択・Ctrl+Z/Y）。作図は「📷 画像保存」でPNG化できます。</p>
+          <p id="canvas-keyboard-help" class="text-xs text-slate-500 px-4 py-2">💡 ヒント：ツールバーの「● 点」「📏 線分」「⭕ 円」で<strong>自分で作図</strong>できます。キーボード: キャンバスにフォーカスし、矢印キーでカーソル移動（Shift+矢印で細かく移動）、Enterで選択ツールを実行。V選択・P点・S線分・L直線・C円・T垂線・R平行・E中点垂線・G接線・B二等分・A角度・D削除・Esc選択・Ctrl+Z/Y。作図は「📷 画像保存」でPNG化できます。</p>
+          <p id="canvas-keyboard-status" class="sr-only" role="status" aria-live="polite"></p>
           <!-- 関数グラフ入力バー -->
           <div id="function-bar" class="px-3 py-2 border-t bg-slate-50 flex flex-col gap-2">
             <div class="flex flex-wrap gap-2 items-center">
@@ -274,11 +269,33 @@
             <div class="flex flex-wrap gap-2" aria-label="記録帳の保存と復元">
               <button id="journal-export-json-btn" type="button" class="tool-btn">⬇️ 記録をJSON保存</button>
               <button id="journal-export-csv-btn" type="button" class="tool-btn">⬇️ 記録をCSV保存</button>
+              <button id="journal-export-report-btn" type="button" class="tool-btn">📄 提出用レポート</button>
               <button id="journal-export-portfolio-btn" type="button" class="tool-btn">🔒 匿名ポートフォリオ</button>
               <button id="journal-import-btn" type="button" class="tool-btn">⬆️ JSONから復元</button>
               <input id="journal-import-input" type="file" accept="application/json,.json" class="hidden" />
             </div>
             <p id="journal-export-status" class="text-xs text-slate-600" role="status" aria-live="polite"></p>
+            <dialog id="journal-report-dialog" aria-labelledby="journal-report-heading" aria-describedby="journal-report-privacy">
+              <h3 id="journal-report-heading" class="text-lg font-extrabold mb-2">提出用レポートの内容を選ぶ</h3>
+              <p id="journal-report-privacy" class="text-sm text-slate-600 mb-3">選択した探究記録からレポートJSONを作成します。ファイルはこの端末に保存され、サーバーへ送信されません。氏名は明示的に選んだ場合のみ含みます。</p>
+              <label for="journal-report-entry" class="block text-sm font-bold mb-1">提出する記録</label>
+              <select id="journal-report-entry" class="w-full border rounded-xl px-3 py-2 min-h-[44px] mb-3"></select>
+              <fieldset class="grid gap-2 mb-3">
+                <legend class="text-sm font-bold mb-1">レポートに含める項目</legend>
+                <label><input id="journal-report-include-task" type="checkbox" checked /> 課題名</label>
+                <label><input id="journal-report-include-prediction" type="checkbox" checked /> 予想</label>
+                <label><input id="journal-report-include-checks" type="checkbox" checked /> 検証項目と結果</label>
+                <label><input id="journal-report-include-reflection" type="checkbox" checked /> 振り返り</label>
+                <label><input id="journal-report-include-construction" type="checkbox" checked disabled /> 作図データ（選択した記録に作図がある場合）</label>
+                <label><input id="journal-report-include-name" type="checkbox" /> 氏名を含める</label>
+                <input id="journal-report-name" type="text" autocomplete="name" aria-label="提出用レポートに含める氏名" placeholder="氏名（任意）" class="w-full border rounded-xl px-3 py-2 min-h-[44px]" disabled />
+              </fieldset>
+              <p id="journal-report-status" class="text-sm text-slate-600 mb-3" role="status" aria-live="polite"></p>
+              <div class="flex flex-wrap justify-end gap-2">
+                <button id="journal-report-cancel" type="button" class="tool-btn">キャンセル</button>
+                <button id="journal-report-download" type="button" class="tool-btn verify-btn">選択内容で保存</button>
+              </div>
+            </dialog>
             <div id="journal-entries" class="space-y-2 max-h-[260px] overflow-y-auto" aria-live="polite"></div>
           </div>
           </div>
@@ -316,6 +333,7 @@
                 <button id="quest-back-btn" type="button" class="tool-btn" title="コース一覧に戻る">↩ 一覧</button>
               </div>
               <p id="quest-active-goal" class="text-sm"></p>
+              <p id="quest-check-scope" class="text-xs text-slate-600" role="note"></p>
               <div id="quest-learning-context" class="grid gap-2 sm:grid-cols-2"></div>
               <ol id="quest-steps" class="space-y-1 text-sm"></ol>
               <label for="quest-reflection-input" class="text-sm font-bold">発見したこと・根拠（必須）
@@ -370,7 +388,7 @@
       </div>
 
       <!-- ===== 教師モード表示 ===== -->
-      <div id="teacher-view" role="tabpanel" aria-labelledby="mode-teacher-btn" class="hidden flex-col gap-4">
+      <div id="teacher-view" role="tabpanel" aria-labelledby="mode-teacher-btn" aria-hidden="true" tabindex="0" class="hidden flex-col gap-4">
         <section class="bg-white rounded-2xl shadow p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 class="font-extrabold">🗺 図形探究課題ライブラリ</h2>
@@ -416,7 +434,7 @@
         </div>
 
         <!-- 指導案出力タブ -->
-        <section id="panel-lesson-plan" role="tabpanel" aria-labelledby="tab-lesson-plan" data-teacher-panel="lesson-plan" class="teacher-panel bg-white rounded-2xl shadow p-5">
+        <section id="panel-lesson-plan" role="tabpanel" aria-labelledby="tab-lesson-plan" aria-hidden="false" data-teacher-panel="lesson-plan" class="teacher-panel bg-white rounded-2xl shadow p-5">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h2 class="font-extrabold">📝 学習指導案（3観点対応）</h2>
             <div class="flex gap-2">
@@ -430,7 +448,7 @@
         </section>
 
         <!-- 印刷・板書用高解像度図形タブ -->
-        <section id="panel-print-figure" role="tabpanel" aria-labelledby="tab-print-figure" data-teacher-panel="print-figure" class="teacher-panel hidden bg-white rounded-2xl shadow p-5">
+        <section id="panel-print-figure" role="tabpanel" aria-labelledby="tab-print-figure" aria-hidden="true" data-teacher-panel="print-figure" class="teacher-panel hidden bg-white rounded-2xl shadow p-5">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h2 class="font-extrabold">🖨️ 印刷・板書用 高解像度図形（A4横）</h2>
             <div class="flex gap-2">
@@ -448,7 +466,7 @@
         </section>
 
         <!-- ワークシート・問題集タブ -->
-        <section id="panel-worksheet" role="tabpanel" aria-labelledby="tab-worksheet" data-teacher-panel="worksheet" class="teacher-panel hidden bg-white rounded-2xl shadow p-5">
+        <section id="panel-worksheet" role="tabpanel" aria-labelledby="tab-worksheet" aria-hidden="true" data-teacher-panel="worksheet" class="teacher-panel hidden bg-white rounded-2xl shadow p-5">
           <h2 class="font-extrabold mb-3">📋 ワークシート・小テスト</h2>
           <div class="grid gap-4 md:grid-cols-2">
             <div class="border rounded-xl p-4">
@@ -479,7 +497,7 @@
       </div>
 
       <!-- コマンドパレット（Ctrl+K） -->
-      <div id="cmd-palette" class="hidden fixed inset-0 z-50" role="dialog" aria-label="コマンドパレット">
+      <div id="cmd-palette" class="hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="cmd-hint">
         <div id="cmd-backdrop" class="absolute inset-0 bg-black/40"></div>
         <div id="cmd-box">
           <input id="cmd-input" type="text" placeholder="コマンドを入力…（例：検証・保存・立体）" aria-label="コマンド検索" />
@@ -496,14 +514,14 @@
   </footer>
 
   <!-- アプリロジック（描画エンジン → 制御の順で読込） -->
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="vendor/katex/katex.min.js"></script>
   <script src="js/renderer.js" defer></script>
   <script src="js/quests.js" defer></script>
   <script src="js/quest-validation.js" defer></script>
   <script src="js/app.js" defer></script>
   <!-- 3D立体ビュー（three.jsモジュール） -->
   <script type="importmap">
-    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    { "imports": { "three": "vendor/three.module.min.js" } }
   </script>
   <script type="module" src="js/solid.js"></script>
 </body>

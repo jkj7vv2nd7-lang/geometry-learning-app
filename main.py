@@ -275,6 +275,7 @@ async def discover_theorems(req: DiscoverRequest) -> DiscoverResponse:
 if FRONTEND_DIR.is_dir():
     app.mount("/css", StaticFiles(directory=FRONTEND_DIR / "css"), name="css")
     app.mount("/js", StaticFiles(directory=FRONTEND_DIR / "js"), name="js")
+    app.mount("/vendor", StaticFiles(directory=FRONTEND_DIR / "vendor"), name="vendor")
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:

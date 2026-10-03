@@ -445,5 +445,23 @@
     }).filter(Boolean);
   }
 
-  global.QuestValidation = { evaluate: evaluate };
+  function describeChecks(checks) {
+    var profile = { localGeometry: 0, activityEvidence: 0, serverVerification: 0, unsupported: 0 };
+    (checks || []).forEach(function (check) {
+      if (!check || typeof check.kind !== 'string') {
+        profile.unsupported++;
+      } else if (check.kind.indexOf('geometry_') === 0 && checkGeometry(check.kind.slice(9), {}) !== null) {
+        profile.localGeometry++;
+      } else if (check.kind.indexOf('min_') === 0) {
+        profile.activityEvidence++;
+      } else if (check.kind === 'has_check' || check.kind === 'has_theorem') {
+        profile.serverVerification++;
+      } else {
+        profile.unsupported++;
+      }
+    });
+    return profile;
+  }
+
+  global.QuestValidation = { evaluate: evaluate, describeChecks: describeChecks };
 })(window);

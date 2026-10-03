@@ -51,6 +51,42 @@
   font-weight: 800;
 }
 .teacher-lesson-chip button:hover { background: #e2e8f0; }
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  border: 2px solid #0f172a;
+  transform: translateY(-160%);
+}
+.skip-link:focus { transform: translateY(0); }
+dialog#journal-report-dialog {
+  width: min(92vw, 40rem);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1.25rem;
+  border: 0;
+  border-radius: 1rem;
+  color: #0f172a;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+}
+dialog#journal-report-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.55);
+}
+dialog#journal-report-dialog label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 40px;
+}
+dialog#journal-report-dialog input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+}
 .verify-btn {
   background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
   color: #fff !important;
@@ -62,6 +98,10 @@
 }
 #geometry-canvas .construct-point:active {
   cursor: grabbing;
+}
+#geometry-canvas:focus-visible {
+  outline: 4px solid #1d4ed8;
+  outline-offset: -4px;
 }
 
 /* ============================================================
@@ -820,6 +860,11 @@ body.teacher-mode #add-url-btn:hover {
   color: #fff !important;
   box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
 }
+#teacher-quest-select {
+  width: min(100%, 26rem);
+  min-width: 0;
+  max-width: 100%;
+}
 
 /* ============================================================
  * 4. アップロードゾーン（ドラッグ＆ドロップ）
@@ -1067,6 +1112,12 @@ textarea:focus-visible {
 /* ============================================================
  * 8. レスポンシブ微調整（タブレット・電子黒板）
  * ============================================================ */
+@media (max-width: 640px) {
+  #teacher-quest-select {
+    width: 100%;
+  }
+}
+
 @media (max-width: 1023px) {
   #control-panel {
     position: static !important;
@@ -1074,6 +1125,35 @@ textarea:focus-visible {
   .teacher-tab {
     font-size: 15px;
     min-height: 52px;
+  }
+  #construct-toolbar .construct-tool,
+  #construct-toolbar .tool-btn {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  #geometry-canvas:focus-visible,
+  .upload-zone:focus-visible {
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
   }
 }
 

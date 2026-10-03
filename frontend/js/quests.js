@@ -719,5 +719,21 @@
     if (counterexamples[q.id]) {
       q.starterVariants.counterexample = counterexamples[q.id](JSON.parse(JSON.stringify(q.starter)));
     }
+    q.lessonPlan = {
+      durationMinutes: 50,
+      phases: [
+        { label: '導入・問いの共有', minutes: 5 },
+        { label: '予想を立てる', minutes: 5 },
+        { label: '作図・操作・検証', minutes: 25 },
+        { label: '結果の比較・説明', minutes: 10 },
+        { label: 'まとめ・振り返り', minutes: 5 }
+      ],
+      materials: ['ブラウザで動作する作図キャンバス', '必要に応じて紙・鉛筆・定規・コンパス'],
+      teacherPrompts: [q.question, q.prediction, q.validation],
+      commonMisconceptions: q.id === 'junior1-solid-views' ?
+        ['見取図の奥行き方向の長さを、実際の長さと同じだと考える', '見えない辺を立体に存在しない辺だと判断する'] :
+        ['測定した1例だけで、関係がいつも成り立つと結論づける', '見た目の近さと作図条件・数学的な根拠を同じものとして扱う'],
+      reflectionPrompts: ['予想と異なったところ、または確かめられたところは何ですか。', 'どの作図・測定が根拠になり、どこをさらに説明する必要がありますか。']
+    };
   });
 })(window);

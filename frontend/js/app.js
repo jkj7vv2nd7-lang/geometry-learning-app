@@ -123,8 +123,16 @@
 
     // 右エリアの表示切替
     var sv = $('student-view'), tv = $('teacher-view');
-    if (sv) { sv.classList.toggle('hidden', currentMode !== 'student'); sv.classList.toggle('flex', currentMode === 'student'); }
-    if (tv) { tv.classList.toggle('hidden', currentMode !== 'teacher'); tv.classList.toggle('flex', currentMode === 'teacher'); }
+    if (sv) {
+      sv.classList.toggle('hidden', currentMode !== 'student');
+      sv.classList.toggle('flex', currentMode === 'student');
+      sv.setAttribute('aria-hidden', String(currentMode !== 'student'));
+    }
+    if (tv) {
+      tv.classList.toggle('hidden', currentMode !== 'teacher');
+      tv.classList.toggle('flex', currentMode === 'teacher');
+      tv.setAttribute('aria-hidden', String(currentMode !== 'teacher'));
+    }
 
     // 左：アップロードゾーンの活性/非活性
     var area = $('teacher-source-area'), uz = $('upload-zone');
@@ -139,6 +147,16 @@
     var sb = $('mode-student-btn'), tb = $('mode-teacher-btn');
     if (sb) sb.addEventListener('click', function () { setMode('student'); });
     if (tb) tb.addEventListener('click', function () { setMode('teacher'); });
+    [sb, tb].filter(Boolean).forEach(function (tab, index, tabs) {
+      tab.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+        event.preventDefault();
+        var next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
+          (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+        tabs[next].focus();
+        tabs[next].click();
+      });
+    });
     setMode(document.body.getAttribute('data-mode') || 'student');
   }
 
@@ -147,7 +165,7 @@
   // ============================================================ */
   function initTeacherTabs() {
     var tabs = document.querySelectorAll('[data-teacher-tab]');
-    tabs.forEach(function (tab) {
+    Array.prototype.forEach.call(tabs, function (tab, index) {
       tab.addEventListener('click', function () {
         var key = tab.getAttribute('data-teacher-tab');
         tabs.forEach(function (t) {
@@ -158,7 +176,16 @@
         document.querySelectorAll('[data-teacher-panel]').forEach(function (p) {
           var show = p.getAttribute('data-teacher-panel') === key;
           p.classList.toggle('hidden', !show);
+          p.setAttribute('aria-hidden', String(!show));
         });
+      });
+      tab.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+        event.preventDefault();
+        var next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 :
+          (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+        tabs[next].focus();
+        tabs[next].click();
       });
     });
   }
@@ -209,8 +236,8 @@
 
   function addFiles(fileList) {
     if (document.body.getAttribute('data-mode') !== 'teacher') {
-      addChatMessage('📂 ソース材料のアップロードは「教師モード」で利用できます。ヘッダーで教師モードに切り替えてください。', 'ai');
-      setMode('teacher');
+      var status = $('teacher-quest-status');
+      if (status) status.textContent = 'ソース材料のアップロードは教師モードで利用できます。モードを切り替えてから追加してください。';
       return;
     }
     Array.prototype.forEach.call(fileList || [], function (f) {
@@ -228,9 +255,14 @@
   function initUploadZone() {
     var uz = $('upload-zone'), fi = $('file-input');
     if (!uz || !fi) return;
-    uz.addEventListener('click', function () { fi.click(); });
+    uz.addEventListener('click', function () {
+      if (document.body.getAttribute('data-mode') === 'teacher') fi.click();
+    });
     uz.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (document.body.getAttribute('data-mode') === 'teacher') fi.click();
+      }
     });
     fi.addEventListener('change', function () { addFiles(fi.files); fi.value = ''; });
     ['dragenter', 'dragover'].forEach(function (ev) {
@@ -426,10 +458,12 @@
 
     // ツール切替
     document.querySelectorAll('[data-construct-tool]').forEach(function (btn) {
+      btn.setAttribute('aria-pressed', String(btn.getAttribute('data-construct-tool') === 'select'));
       btn.addEventListener('click', function () {
         CB.setTool(btn.getAttribute('data-construct-tool'));
         document.querySelectorAll('[data-construct-tool]').forEach(function (b) {
           b.classList.toggle('construct-tool-active', b === btn);
+          b.setAttribute('aria-pressed', String(b === btn));
         });
         var tb = $('construct-toolbar');
         if (tb) tb.classList.remove('dial-open'); // ダイヤル表示では選択後に閉じる
@@ -442,6 +476,47 @@
       CB.handleClick(svg, e);
     });
     CB.attachDrag(svg);
+    var keyboardCursor = { x: 400, y: 250 };
+    var cursorLayer = $('keyboard-cursor-layer');
+    if (cursorLayer) {
+      var cursor = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      cursor.setAttribute('r', '9');
+      cursor.setAttribute('fill', '#facc15');
+      cursor.setAttribute('stroke', '#0f172a');
+      cursor.setAttribute('stroke-width', '3');
+      cursor.setAttribute('pointer-events', 'none');
+      cursorLayer.appendChild(cursor);
+      function renderKeyboardCursor() {
+        cursor.setAttribute('cx', String(keyboardCursor.x));
+        cursor.setAttribute('cy', String(keyboardCursor.y));
+        var status = $('canvas-keyboard-status');
+        if (status) status.textContent = '作図カーソル: x ' + keyboardCursor.x + '、y ' + keyboardCursor.y +
+          '。選択中のツール「' + CB.getTool() + '」を使うにはEnterを押します。';
+      }
+      renderKeyboardCursor();
+      svg.addEventListener('keydown', function (event) {
+        var directions = {
+          ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]
+        };
+        if (directions[event.key]) {
+          event.preventDefault();
+          var increment = event.shiftKey ? 5 : 20;
+          keyboardCursor.x = Math.max(20, Math.min(780, keyboardCursor.x + directions[event.key][0] * increment));
+          keyboardCursor.y = Math.max(20, Math.min(480, keyboardCursor.y + directions[event.key][1] * increment));
+          renderKeyboardCursor();
+        } else if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          var transform = svg.getScreenCTM();
+          if (!transform) return;
+          var screenPoint = svg.createSVGPoint();
+          screenPoint.x = keyboardCursor.x;
+          screenPoint.y = keyboardCursor.y;
+          screenPoint = screenPoint.matrixTransform(transform);
+          CB.handleClick(svg, { clientX: screenPoint.x, clientY: screenPoint.y });
+          renderKeyboardCursor();
+        }
+      });
+    }
 
     // 吸着トグル
     var snapBtn = $('toggle-snap-btn');
@@ -546,7 +621,7 @@
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(function () {
         try { localStorage.setItem(CONSTRUCT_STORE_KEY, JSON.stringify(CB.getFullState())); } catch (_) {}
-        scheduleQuestDraftSave();
+        if (Date.now() >= preserveQuestDraftUntil) scheduleQuestDraftSave();
       }, 400);
     });
     // 前回の作図・履歴を復元（なければ「開始」で初期化）
@@ -678,7 +753,8 @@
           comment: String(entry.comment || ''),
           questId: String(entry.questId || ''),
           questTitle: String(entry.questTitle || ''),
-          reflection: String(entry.reflection || '')
+          reflection: String(entry.reflection || ''),
+          construction: entry.construction && typeof entry.construction === 'object' ? entry.construction : null
         };
       });
     }
@@ -829,7 +905,8 @@
         time: new Date().toLocaleString('ja-JP'), createdAt: new Date().toISOString(),
         prediction: pred, checks: lastVerify.checks, comment: lastVerify.comment,
         questId: activeQuest ? activeQuest.id : '', questTitle: activeQuest ? activeQuest.title : '',
-        reflection: activeQuest && $('quest-reflection-input') ? $('quest-reflection-input').value.trim() : ''
+        reflection: activeQuest && $('quest-reflection-input') ? $('quest-reflection-input').value.trim() : '',
+        construction: window.ConstructionBoard ? window.ConstructionBoard.serialize({ traces: true }) : null
       });
       if (!saveJournal(arr)) return;
       if (inp) inp.value = '';
@@ -839,9 +916,103 @@
     var jsonBtn = $('journal-export-json-btn');
     var csvBtn = $('journal-export-csv-btn');
     var portfolioBtn = $('journal-export-portfolio-btn');
+    var reportBtn = $('journal-export-report-btn');
     if (jsonBtn) jsonBtn.addEventListener('click', function () { exportJournal('json'); });
     if (csvBtn) csvBtn.addEventListener('click', function () { exportJournal('csv'); });
     if (portfolioBtn) portfolioBtn.addEventListener('click', exportAnonymousPortfolio);
+    var reportDialog = $('journal-report-dialog');
+    var reportSelect = $('journal-report-entry');
+    var includeName = $('journal-report-include-name');
+    var studentName = $('journal-report-name');
+    var includeConstruction = $('journal-report-include-construction');
+    var reportStatus = $('journal-report-status');
+    if (includeName && studentName) includeName.addEventListener('change', function () {
+      studentName.disabled = !includeName.checked;
+      if (includeName.checked) studentName.focus();
+      else studentName.value = '';
+    });
+    if (reportSelect && includeConstruction) reportSelect.addEventListener('change', function () {
+      var selected = loadJournal()[Number(reportSelect.value)];
+      includeConstruction.disabled = !selected || !selected.construction;
+      includeConstruction.checked = !!(selected && selected.construction);
+    });
+    if (reportBtn && reportDialog && reportSelect) reportBtn.addEventListener('click', function () {
+      var entries = loadJournal();
+      if (!entries.length) {
+        if (reportStatus) reportStatus.textContent = '提出用レポートに含める探究記録がありません。';
+        return;
+      }
+      reportSelect.innerHTML = '';
+      entries.map(function (entry, index) { return { entry: entry, index: index }; })
+        .sort(function (a, b) {
+          var first = Date.parse(a.entry.createdAt || a.entry.time);
+          var second = Date.parse(b.entry.createdAt || b.entry.time);
+          if (!Number.isFinite(first) || !Number.isFinite(second)) return b.index - a.index;
+          return second - first;
+        }).forEach(function (item) {
+          var option = document.createElement('option');
+          option.value = String(item.index);
+          option.textContent = (item.entry.questTitle || '自由探究') + ' — ' + (item.entry.time || '日時不明');
+          reportSelect.appendChild(option);
+        });
+      if (includeName) includeName.checked = false;
+      if (studentName) { studentName.value = ''; studentName.disabled = true; }
+      if (reportStatus) reportStatus.textContent = '記録を選び、含める項目を確認してください。氏名は選択しない限り出力されません。';
+      reportSelect.dispatchEvent(new Event('change'));
+      reportDialog.showModal();
+    });
+    var reportClose = $('journal-report-cancel');
+    if (reportClose && reportDialog) reportClose.addEventListener('click', function () { reportDialog.close(); });
+    var reportDownload = $('journal-report-download');
+    if (reportDownload && reportDialog && reportSelect) reportDownload.addEventListener('click', function () {
+      var entry = loadJournal()[Number(reportSelect.value)];
+      if (!entry) {
+        if (reportStatus) reportStatus.textContent = '選択した記録が見つかりません。記録帳を更新してから選び直してください。';
+        return;
+      }
+      if (includeName && includeName.checked && (!studentName || !studentName.value.trim())) {
+        if (reportStatus) reportStatus.textContent = '氏名を含める場合は氏名欄に入力してください。';
+        if (studentName) studentName.focus();
+        return;
+      }
+      var report = {
+        schemaVersion: 1,
+        reportType: 'geometry-inquiry-submission',
+        exportedAt: new Date().toISOString(),
+        recordedAt: entry.time
+      };
+      if (includeName && includeName.checked && studentName) report.studentName = studentName.value.trim();
+      var selectedTask = $('journal-report-include-task');
+      var selectedPrediction = $('journal-report-include-prediction');
+      var selectedChecks = $('journal-report-include-checks');
+      var selectedReflection = $('journal-report-include-reflection');
+      if (selectedTask && selectedTask.checked) {
+        report.task = { id: entry.questId, title: entry.questTitle };
+      }
+      if (selectedPrediction && selectedPrediction.checked) report.prediction = entry.prediction;
+      if (selectedChecks && selectedChecks.checked) {
+        report.checks = entry.checks.map(function (check) {
+          return { name: check.name, passed: check.passed };
+        });
+      }
+      if (selectedReflection && selectedReflection.checked) report.reflection = entry.reflection;
+      if (includeConstruction && includeConstruction.checked && entry.construction) {
+        report.construction = entry.construction;
+      }
+      if (!report.task && !Object.prototype.hasOwnProperty.call(report, 'prediction') &&
+          !Object.prototype.hasOwnProperty.call(report, 'checks') &&
+          !Object.prototype.hasOwnProperty.call(report, 'reflection') &&
+          !Object.prototype.hasOwnProperty.call(report, 'construction')) {
+        if (reportStatus) reportStatus.textContent = '少なくとも1つ、レポートに含める学習内容を選んでください。';
+        return;
+      }
+      var date = new Date().toISOString().slice(0, 10);
+      downloadFile('geometry-inquiry-report-' + date + '.json',
+        JSON.stringify(report, null, 2), 'application/json;charset=utf-8');
+      reportDialog.close();
+      if (reportStatus) reportStatus.textContent = '選択した学習内容だけを提出用レポートに保存しました。';
+      if (studentName) { studentName.value = ''; studentName.disabled = true; }
+    });
     var importBtn = $('journal-import-btn');
     var importInput = $('journal-import-input');
     if (importBtn && importInput) {
@@ -871,7 +1042,8 @@
                 comment: String(entry.comment || ''),
                 questId: String(entry.questId || ''),
                 questTitle: String(entry.questTitle || ''),
-                reflection: String(entry.reflection || '')
+                reflection: String(entry.reflection || ''),
+                construction: entry.construction && typeof entry.construction === 'object' ? entry.construction : null
               };
             }).filter(function (entry) {
               var key = entry.time + '\n' + entry.prediction;
@@ -1069,9 +1241,13 @@
     function applyTools(show) {
       if (!toolbar) return;
       toolbar.classList.toggle('toolbar-hidden', !show);
+      toolbar.setAttribute('aria-hidden', String(!show));
+      toolbar.inert = !show;
       if (toolsToggle) {
         toolsToggle.textContent = show ? '🛠' : '🧰';
+        toolsToggle.setAttribute('aria-label', show ? '作図ツールを隠す' : '作図ツールを表示');
         toolsToggle.classList.toggle('tools-hidden', !show);
+        toolsToggle.setAttribute('aria-expanded', String(!!show));
       }
     }
     applyTools(pref.toolsHidden ? false : true);
@@ -1409,6 +1585,7 @@
   var questStepDone = [];
   var questHintIdx = 0;
   var questDraftTimer = null;
+  var preserveQuestDraftUntil = 0;
   function questDraftKey(id) { return 'quest-draft-v1-' + id; }
   function readQuestDraft(id) {
     try {
@@ -1524,6 +1701,17 @@
     questHintIdx = 0;
     $('quest-active-title').textContent = '🗺 ' + q.title + '（' + q.grade + '・' + q.unit + '）';
     $('quest-active-goal').textContent = '🎯 ' + q.goal;
+    var checkScope = $('quest-check-scope');
+    if (checkScope && window.QuestValidation) {
+      var profile = window.QuestValidation.describeChecks(q.checks);
+      var scopeParts = [];
+      if (profile.localGeometry) scopeParts.push('作図の幾何関係を端末内で確認 ' + profile.localGeometry + '項目');
+      if (profile.activityEvidence) scopeParts.push('作図要素数・活動条件を確認 ' + profile.activityEvidence + '項目');
+      if (profile.serverVerification) scopeParts.push('ローカルサーバーの判定 ' + profile.serverVerification + '項目（APIキー不要）');
+      if (profile.unsupported) scopeParts.push('未対応の条件 ' + profile.unsupported + '項目（達成扱いになりません）');
+      checkScope.textContent = '自動確認の範囲: ' + (scopeParts.join('／') || '教師が説明・根拠を確認') +
+        '。作図の確認は証明や理解度の採点ではありません。';
+    }
     var context = $('quest-learning-context');
     if (context) {
       context.innerHTML = '';
@@ -1602,6 +1790,16 @@
     });
   }
 
+  function assessmentScopeText(q) {
+    var profile = window.QuestValidation ? window.QuestValidation.describeChecks(q.checks) :
+      { localGeometry: 0, activityEvidence: 0, serverVerification: 0, unsupported: (q.checks || []).length };
+    var parts = [];
+    if (profile.localGeometry) parts.push('端末内の幾何関係 ' + profile.localGeometry + '項目');
+    if (profile.activityEvidence) parts.push('作図要素・活動条件 ' + profile.activityEvidence + '項目（理解の証拠ではありません）');
+    if (profile.serverVerification) parts.push('ローカルサーバー判定 ' + profile.serverVerification + '項目');
+    if (profile.unsupported) parts.push('未対応 ' + profile.unsupported + '項目');
+    return parts.join('、') || '教師が説明・根拠を確認';
+  }
   function teacherWorksheet(q, audience) {
     var teacher = audience !== 'learner';
     var lines = [
@@ -1623,12 +1821,23 @@
     q.steps.forEach(function (step, index) { lines.push((index + 1) + '. ' + step); });
     lines.push('', '## 予想・記録', '予想: ______________________________________________',
       '', '測定・作図で確かめたこと: ____________________________',
-      '', '発見したことと根拠: __________________________________');
+      '', '発見したことと根拠: __________________________________',
+      '', '## 振り返り',
+      (q.lessonPlan.reflectionPrompts || []).map(function (prompt) { return '- ' + prompt; }).join('\n'),
+      '', '気づいたこと・次に確かめたいこと: ___________________');
     if (teacher) {
-      lines.push('', '## 着目点', q.focus, '', '## 予想の視点', q.prediction,
-        '', '## 検証の観点', q.validation, '', '## 発見・まとめ', q.discovery,
-        '', '## 授業準備', '想定時間: ' + (q.lessonMinutes || 20) + '分',
-        '準備物: 作図キャンバス（端末・ブラウザ）。必要に応じて定規・コンパス。',
+      lines.push('', '## 着目点', q.focus, '', '## 発見・まとめ', q.discovery,
+        '', '## 授業準備', '想定時間: ' + q.lessonPlan.durationMinutes + '分',
+        '準備物:', q.lessonPlan.materials.map(function (item) { return '- ' + item; }).join('\n'),
+        '', '## 授業の流れ',
+        q.lessonPlan.phases.map(function (phase) { return '- ' + phase.minutes + '分: ' + phase.label; }).join('\n'),
+        '', '## 発問例',
+        q.lessonPlan.teacherPrompts.map(function (prompt) { return '- ' + prompt; }).join('\n'),
+        '', '## 予想されるつまずき',
+        q.lessonPlan.commonMisconceptions.map(function (item) { return '- ' + item; }).join('\n'),
+        '', '## 振り返りの問い',
+        q.lessonPlan.reflectionPrompts.map(function (prompt) { return '- ' + prompt; }).join('\n'),
+        '自動確認の範囲: ' + assessmentScopeText(q),
         '', '## 観点別評価メモ',
         '知識・技能: 作図・測定を適切に行い、必要な性質を用いている。',
         '思考・判断・表現: 予想を立て、複数の例や反例を用いて関係を説明している。',
@@ -1666,8 +1875,24 @@
       preview.appendChild(meta);
       var lessonMeta = document.createElement('p');
       lessonMeta.className = 'text-xs text-slate-600 mb-2';
-      lessonMeta.textContent = '想定 ' + (q.lessonMinutes || 20) + '分・準備: 作図キャンバス（端末・ブラウザ）';
+      lessonMeta.textContent = '想定 ' + q.lessonPlan.durationMinutes + '分・準備: ' + q.lessonPlan.materials.join('、');
       preview.appendChild(lessonMeta);
+      var coverage = document.createElement('p');
+      coverage.className = 'text-xs text-slate-600 mb-2';
+      coverage.textContent = '自動確認: ' + assessmentScopeText(q) +
+        '。作図チェックは証明・理解度の評価ではありません。';
+      preview.appendChild(coverage);
+      [
+        ['授業の流れ', q.lessonPlan.phases.map(function (phase) { return phase.minutes + '分 ' + phase.label; }).join('／')],
+        ['発問例', q.lessonPlan.teacherPrompts.join(' / ')],
+        ['予想されるつまずき', q.lessonPlan.commonMisconceptions.join(' / ')],
+        ['振り返りの問い', q.lessonPlan.reflectionPrompts.join(' / ')]
+      ].forEach(function (item) {
+        var note = document.createElement('p');
+        note.className = 'text-xs text-slate-600 mb-2';
+        note.textContent = item[0] + ': ' + item[1];
+        preview.appendChild(note);
+      });
       [
         ['導入', q.scenario], ['問い', q.question], ['目標', q.goal],
         ['着目点', q.focus], ['予想', q.prediction], ['検証', q.validation], ['まとめ', q.discovery]
@@ -1747,7 +1972,7 @@
       var selected = lessonSet.map(function (id) {
         return sorted.filter(function (q) { return q.id === id; })[0];
       }).filter(Boolean);
-      var minutes = selected.reduce(function (sum, q) { return sum + (q.lessonMinutes || 20); }, 0);
+      var minutes = selected.reduce(function (sum, q) { return sum + q.lessonPlan.durationMinutes; }, 0);
       estimate.textContent = selected.length + '課題・想定合計 ' + minutes + '分（1課題の想定時間を合算）';
       selected.forEach(function (q) {
         var item = document.createElement('span');
@@ -1891,6 +2116,7 @@
       if (!activeQuest) return;
       var variants = activeQuest.starterVariants || { guided: activeQuest.starter, blank: null };
       if (mode === 'counterexample' && !variants.counterexample) return;
+      var savedDraft = !!readQuestDraft(activeQuest.id);
       var stats = window.ConstructionBoard.stats();
       var hasContent = Object.keys(stats).some(function (key) { return stats[key] > 0; });
       var prompts = {
@@ -1899,12 +2125,13 @@
         blank: '白紙から始めるため、現在の作図内容を消去します。続けますか？'
       };
       if (hasContent && !window.confirm(prompts[mode])) return;
+      if (savedDraft) preserveQuestDraftUntil = Date.now() + 500;
       if (mode === 'blank') window.ConstructionBoard.load(null);
       else window.ConstructionBoard.load(JSON.parse(JSON.stringify(variants[mode])));
       addChatMessage(mode === 'guided' ? '🧩 手がかり付きの土台を配置しました。続きを作図してみよう！' :
         mode === 'counterexample' ? '🔎 性質が成り立たない例を配置しました。どの条件が違うか調べよう！' :
           '▫️ 白紙の作図キャンバスを用意しました。自分で図を作ってみよう！', 'ai');
-      scheduleQuestDraftSave();
+      if (!savedDraft) scheduleQuestDraftSave();
     }
     ['guided', 'counterexample', 'blank'].forEach(function (mode) {
       var button = $('quest-starter-' + mode + '-btn');
@@ -2046,7 +2273,8 @@
           comment: results[1] ? results[1].report_md.slice(0, 500) : activeQuest.discovery,
           questId: activeQuest.id,
           questTitle: activeQuest.title,
-          reflection: reflection
+          reflection: reflection,
+          construction: data
         });
         var journalSaved = saveJournal(arr);
         if (journalSaved) renderJournal();
