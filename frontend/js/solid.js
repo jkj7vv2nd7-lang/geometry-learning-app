@@ -11,7 +11,17 @@ var sizeInput = document.getElementById('solid-size');
 var sizeVal = document.getElementById('solid-size-val');
 var rotateBtn = document.getElementById('solid-rotate-btn');
 
-if (container) {
+// 遅延初期化：初回展開時に three.js シーンを構築する（普段のコストゼロ）
+var solidInitialized = false;
+
+function initSolid() {
+  if (solidInitialized) {
+    if (typeof resizeSolid === 'function') resizeSolid();
+    if (typeof refreshSolid === 'function') refreshSolid();
+    return;
+  }
+  if (!container || typeof THREE === 'undefined') return;
+  solidInitialized = true;
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
   camera.position.set(4.2, 3.2, 5.2);
@@ -89,7 +99,7 @@ if (container) {
     return (Math.round(n * 100) / 100).toString();
   }
 
-  function refresh() {
+  function refreshSolid() {
     var a = parseFloat(sizeInput.value) || 2;
     if (sizeVal) sizeVal.textContent = a;
     while (group.children.length) {
@@ -122,10 +132,10 @@ if (container) {
       document.querySelectorAll('[data-solid]').forEach(function (b) {
         b.classList.toggle('construct-tool-active', b === btn);
       });
-      refresh();
+      refreshSolid();
     });
   });
-  if (sizeInput) sizeInput.addEventListener('input', refresh);
+  if (sizeInput) sizeInput.addEventListener('input', refreshSolid);
   if (rotateBtn) rotateBtn.addEventListener('click', function () {
     autoRotate = !autoRotate;
     rotateBtn.textContent = autoRotate ? '🔄 回転ON' : '🔄 回転OFF';
@@ -152,16 +162,16 @@ if (container) {
     });
   });
 
-  function resize() {
+  function resizeSolid() {
     var w = container.clientWidth || 600;
     var h = container.clientHeight || 340;
     renderer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
-  window.addEventListener('resize', resize);
-  resize();
-  refresh();
+  window.addEventListener('resize', resizeSolid);
+  resizeSolid();
+  refreshSolid();
 
   (function animate() {
     requestAnimationFrame(animate);
@@ -169,3 +179,8 @@ if (container) {
     renderer.render(scene, camera);
   })();
 }
+
+window.SolidViewer = {
+  expand: initSolid,
+  isReady: function () { return solidInitialized; }
+};

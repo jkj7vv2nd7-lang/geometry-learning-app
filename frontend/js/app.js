@@ -784,6 +784,79 @@
     setInterval(sendHeartbeat, 15000);
   }
 
+  // ---------- 学習レイアウト（パネル折りたたみ・フロートバー・3D折りたたみ） ----------
+  var LAYOUT_STORE_KEY = 'layout-v1';
+  function loadLayout() {
+    try { return JSON.parse(localStorage.getItem(LAYOUT_STORE_KEY) || '{}'); }
+    catch (_) { return {}; }
+  }
+  function saveLayout(patch) {
+    try {
+      var cur = loadLayout();
+      for (var k in patch) cur[k] = patch[k];
+      localStorage.setItem(LAYOUT_STORE_KEY, JSON.stringify(cur));
+    } catch (_) {}
+  }
+  function initLayout() {
+    var pref = loadLayout();
+
+    // 左パネル折りたたみ
+    var panelBtn = $('toggle-panel-btn');
+    var layout = $('app-layout');
+    function applyPanel(collapsed) {
+      if (!layout) return;
+      layout.classList.toggle('panel-collapsed', !!collapsed);
+      if (panelBtn) {
+        panelBtn.textContent = collapsed ? '📋 入力欄表示' : '📋 入力欄';
+        panelBtn.classList.toggle('panel-hidden', !!collapsed);
+        panelBtn.setAttribute('aria-pressed', String(!collapsed));
+      }
+    }
+    applyPanel(!!pref.panelCollapsed);
+    if (panelBtn) panelBtn.addEventListener('click', function () {
+      var collapsed = !layout.classList.contains('panel-collapsed');
+      applyPanel(collapsed);
+      saveLayout({ panelCollapsed: collapsed });
+    });
+
+    // 作図フロートバー表示切替
+    var toolsToggle = $('construct-tools-toggle');
+    var toolbar = $('construct-toolbar');
+    function applyTools(show) {
+      if (!toolbar) return;
+      toolbar.classList.toggle('toolbar-hidden', !show);
+      if (toolsToggle) {
+        toolsToggle.textContent = show ? '🛠' : '🧰';
+        toolsToggle.classList.toggle('tools-hidden', !show);
+      }
+    }
+    applyTools(pref.toolsHidden ? false : true);
+    if (toolsToggle) toolsToggle.addEventListener('click', function () {
+      var show = toolbar.classList.contains('toolbar-hidden');
+      applyTools(show);
+      saveLayout({ toolsHidden: !show });
+    });
+
+    // 3D折りたたみ（初回展開時に遅延初期化）
+    var solidToggle = $('solid-toggle-btn');
+    var solidBody = $('solid-body');
+    function applySolid(open) {
+      if (!solidBody) return;
+      solidBody.classList.toggle('hidden', !open);
+      if (solidToggle) {
+        solidToggle.textContent = open ? '▼ 閉じる' : '▶ 開く';
+        solidToggle.setAttribute('aria-expanded', String(open));
+      }
+      if (open && window.SolidViewer) window.SolidViewer.expand();
+    }
+    applySolid(!!pref.solidOpen);
+    if (solidToggle) solidToggle.addEventListener('click', function () {
+      var open = solidBody.classList.contains('hidden');
+      applySolid(open);
+      saveLayout({ solidOpen: open });
+    });
+  }
+
   function initMisc() {
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
@@ -857,6 +930,7 @@
     initConstructionBoard();
     initFunctionGraph();
     initHeartbeat();
+    initLayout();
     initMisc();
     setStatus('待機中', null);
   });

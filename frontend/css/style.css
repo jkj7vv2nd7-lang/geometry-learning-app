@@ -108,6 +108,73 @@
   font-weight: 700;
 }
 
+/* ============================================================
+ * 11. 学習レイアウト（左パネル折りたたみ・フローティングバー）
+ * ============================================================ */
+/* 左パネル折りたたみ時：キャンバスを全幅に */
+#app-layout.panel-collapsed {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+#app-layout.panel-collapsed #control-panel {
+  display: none;
+}
+#toggle-panel-btn {
+  border: 2px solid transparent;
+}
+#toggle-panel-btn.panel-hidden {
+  background: #facc15 !important;
+  color: #0f172a !important;
+}
+
+/* 作図ツールバー：キャンバス上のフローティング表示 */
+#construct-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 58px;
+  z-index: 10;
+  background: rgba(248, 250, 252, 0.94);
+  backdrop-filter: blur(6px);
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+  max-height: 118px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+#construct-toolbar.toolbar-hidden {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+#construct-tools-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 11;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  font-size: 20px;
+  background: #f59e00;
+  color: #fff;
+  border: 2px solid #b45309;
+  box-shadow: 0 4px 12px rgba(245, 158, 0, 0.45);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  display: grid;
+  place-items: center;
+}
+#construct-tools-toggle:hover {
+  transform: scale(1.08);
+}
+#construct-tools-toggle.tools-hidden {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
 :root {
   /* 児童・生徒モード（青・水色ベース） */
   --student-primary: #2563eb;

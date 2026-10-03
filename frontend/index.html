@@ -37,6 +37,7 @@
 
     <!-- モード切替：児童・生徒 / 教師 -->
     <nav id="mode-switcher" aria-label="モード切替" class="flex items-center gap-2 bg-white/70 p-1 rounded-full">
+      <button id="toggle-panel-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="左の入力パネルを表示／隠す">📋 入力欄</button>
       <button
         id="mode-student-btn"
         type="button"
@@ -157,8 +158,9 @@
           </div>
 
           <div id="canvas-container" class="relative w-full bg-grid">
-            <!-- 作図ツールバー（自分で作図モード） -->
-            <div id="construct-toolbar" class="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b bg-slate-50" role="toolbar" aria-label="作図ツール">
+            <!-- 作図ツールバー（キャンバス上のフローティング表示） -->
+            <button id="construct-tools-toggle" type="button" title="作図ツールを表示／隠す">🛠</button>
+            <div id="construct-toolbar" class="flex flex-wrap items-center gap-1.5 px-3 py-2" role="toolbar" aria-label="作図ツール">
               <button id="tool-select" type="button" data-construct-tool="select" class="construct-tool construct-tool-active" title="選択・移動（点ドラッグで変形）">👆 選択</button>
               <button id="tool-point" type="button" data-construct-tool="point" class="construct-tool" title="点を打つ">● 点</button>
               <button id="tool-segment" type="button" data-construct-tool="segment" class="construct-tool" title="2点を結ぶ線分">📏 線分</button>
@@ -220,40 +222,8 @@
           </div>
         </section>
 
-        <!-- 作図の履歴 -->
-        <section id="history-section" aria-labelledby="history-heading" class="bg-white rounded-2xl shadow overflow-hidden">
-          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b">
-            <h2 id="history-heading" class="font-extrabold text-sm">🕰 作図の履歴（タップで巻き戻し）</h2>
-            <span id="history-count" class="text-xs text-slate-500"></span>
-          </div>
-          <ol id="construct-history" class="p-2 space-y-1 max-h-[140px] overflow-y-auto text-sm" aria-live="polite"></ol>
-        </section>
-
-        <!-- 立体図形（3D） -->
-        <section id="solid-section" aria-labelledby="solid-heading" class="bg-white rounded-2xl shadow overflow-hidden">
-          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
-            <h2 id="solid-heading" class="font-extrabold">🧊 立体図形（3D・ドラッグで回転）</h2>
-            <button id="solid-rotate-btn" type="button" class="tool-btn" aria-pressed="true" title="自動回転の切替">🔄 回転ON</button>
-          </div>
-          <div id="solid-toolbar" class="flex flex-wrap gap-1.5 px-3 py-2" role="toolbar" aria-label="立体選択">
-            <button type="button" data-solid="cube" class="construct-tool construct-tool-active">立方体</button>
-            <button type="button" data-solid="cuboid" class="construct-tool">直方体</button>
-            <button type="button" data-solid="tetra" class="construct-tool">正四面体</button>
-            <button type="button" data-solid="pyramid" class="construct-tool">正四角錐</button>
-            <button type="button" data-solid="octa" class="construct-tool">正八面体</button>
-            <button type="button" data-solid="cylinder" class="construct-tool">円柱</button>
-            <button type="button" data-solid="cone" class="construct-tool">円錐</button>
-            <button type="button" data-solid="sphere" class="construct-tool">球</button>
-          </div>
-          <div class="flex flex-wrap items-center gap-3 px-4 pb-1 text-sm">
-            <label for="solid-size" class="font-bold">大きさ: <span id="solid-size-val">2</span></label>
-            <input id="solid-size" type="range" min="1" max="3" step="0.1" value="2" class="flex-1 min-w-[160px]" />
-          </div>
-          <div id="solid-view" class="w-full cursor-grab" style="height:340px" role="img" aria-label="立体図形ビュー"></div>
-          <div id="solid-measure" class="px-4 py-2 text-sm leading-relaxed border-t" aria-live="polite"></div>
-        </section>
-
-        <!-- チャット・解説エリア -->
+        <!-- @@CHAT@@ -->
+        <!-- チャット・解説エリア（キャンバス直下：作図しながら対話） -->
         <section id="chat-section" aria-labelledby="chat-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
           <h2 id="chat-heading" class="font-extrabold px-4 py-3 border-b">💬 AI先生の解説・問いかけ</h2>
           <div id="chat-messages" class="p-4 space-y-3 max-h-[320px] overflow-y-auto" aria-live="polite">
@@ -267,6 +237,15 @@
           </div>
         </section>
 
+        <!-- 作図の履歴 -->
+        <section id="history-section" aria-labelledby="history-heading" class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b">
+            <h2 id="history-heading" class="font-extrabold text-sm">🕰 作図の履歴（タップで巻き戻し）</h2>
+            <span id="history-count" class="text-xs text-slate-500"></span>
+          </div>
+          <ol id="construct-history" class="p-2 space-y-1 max-h-[140px] overflow-y-auto text-sm" aria-live="polite"></ol>
+        </section>
+
         <!-- 探求の記録帳（予想→検証） -->
         <section id="journal-section" aria-labelledby="journal-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
           <h2 id="journal-heading" class="font-extrabold px-4 py-3 border-b">📓 探求の記録帳（予想 → 検証）</h2>
@@ -278,6 +257,35 @@
             </div>
             <p class="text-xs text-slate-500">②「🔍 AI検証」を押した後に「📌 記録する」を押すと、予想と検証結果がセットで残ります。</p>
             <div id="journal-entries" class="space-y-2 max-h-[260px] overflow-y-auto" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <!-- 立体図形（3D・ふだんは折りたたみ） -->
+        <section id="solid-section" aria-labelledby="solid-heading" class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
+            <h2 id="solid-heading" class="font-extrabold">🧊 立体図形（3D・ドラッグで回転）</h2>
+            <div class="flex gap-2">
+              <button id="solid-toggle-btn" type="button" class="tool-btn" aria-expanded="false" title="立体ビューの表示／非表示">▶ 開く</button>
+              <button id="solid-rotate-btn" type="button" class="tool-btn" aria-pressed="true" title="自動回転の切替">🔄 回転ON</button>
+            </div>
+          </div>
+          <div id="solid-body" class="hidden">
+            <div id="solid-toolbar" class="flex flex-wrap gap-1.5 px-3 py-2" role="toolbar" aria-label="立体選択">
+              <button type="button" data-solid="cube" class="construct-tool construct-tool-active">立方体</button>
+              <button type="button" data-solid="cuboid" class="construct-tool">直方体</button>
+              <button type="button" data-solid="tetra" class="construct-tool">正四面体</button>
+              <button type="button" data-solid="pyramid" class="construct-tool">正四角錐</button>
+              <button type="button" data-solid="octa" class="construct-tool">正八面体</button>
+              <button type="button" data-solid="cylinder" class="construct-tool">円柱</button>
+              <button type="button" data-solid="cone" class="construct-tool">円錐</button>
+              <button type="button" data-solid="sphere" class="construct-tool">球</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 px-4 pb-1 text-sm">
+              <label for="solid-size" class="font-bold">大きさ: <span id="solid-size-val">2</span></label>
+              <input id="solid-size" type="range" min="1" max="3" step="0.1" value="2" class="flex-1 min-w-[160px]" />
+            </div>
+            <div id="solid-view" class="w-full cursor-grab" style="height:340px" role="img" aria-label="立体図形ビュー"></div>
+            <div id="solid-measure" class="px-4 py-2 text-sm leading-relaxed border-t" aria-live="polite"></div>
           </div>
         </section>
       </div>
