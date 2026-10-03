@@ -119,6 +119,8 @@ Python環境がないWindows端末向けに、Python実行環境・FastAPI/Uvico
 
 配布するときは `dist\GeometryLearningApp\` フォルダ全体をコピーします。`GeometryLearningApp.exe` だけを取り出さず、同じフォルダ内の `_internal` などのファイルも一緒に配布してください。利用者はフォルダ内の `GeometryLearningApp.exe` を実行します。サーバーは `127.0.0.1:8000` のみにバインドし、起動したコンソールを閉じずに使います。終了はそのコンソールで **Ctrl+C** を押してください。ポート8000が利用中なら明示的なエラーで終了します。別ポートを使う場合は、PowerShellから `.\GeometryLearningApp.exe --port 8001` のように起動します。
 
+起動できずに終了する場合は、表示されるWindowsエラーダイアログを確認してください。ポート8000使用中の場合は、既存アプリを終了するか、PowerShellで `--port 8001` のように別ポートを明示してください。PowerShellから起動すると、追加の診断情報をコンソールで確認できます。
+
 図形の計算・探究機能はAPIキーなしで利用できます。AI機能を使う場合は、起動前に利用者自身の環境変数 `GEMINI_API_KEY` または `OPENAI_API_KEY` を設定してください。キーはビルドにも配布物にも含まれず、ランチャーは起動元プロセスの環境変数を引き継ぎます。例えばPowerShellでは `$env:GEMINI_API_KEY = "利用者自身のキー"` を設定してからEXEを実行します。EXEは未署名のため、Windows SmartScreenの警告が表示される場合があります。現時点ではコード署名を行っていません。
 
 ### オフライン利用と課題パック

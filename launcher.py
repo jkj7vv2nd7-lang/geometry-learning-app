@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import os
 import signal
 import socket
 import sys
 import threading
 import time
+import traceback
 import webbrowser
 from pathlib import Path
 from urllib.error import URLError
@@ -79,6 +81,15 @@ def _handle_ctrl_break(_signum: int, _frame: object) -> None:
     raise KeyboardInterrupt
 
 
+def _show_startup_error(message: str) -> None:
+    if not getattr(sys, "frozen", False) or sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.user32.MessageBoxW(None, message, "Geometry Learning App", 0x10)
+    except (AttributeError, OSError):
+        print("Launcher error dialog could not be displayed.", file=sys.stderr)
+
+
 def run(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     frontend_index = resource_path("frontend/index.html")
@@ -125,6 +136,14 @@ def main() -> int:
         return run()
     except LauncherError as exc:
         print(f"Launcher error: {exc}", file=sys.stderr)
+        _show_startup_error(f"Geometry Learning App could not start.\n\n{exc}")
+        return 1
+    except Exception:
+        traceback.print_exc()
+        _show_startup_error(
+            "Geometry Learning App could not start because of an unexpected error.\n\n"
+            "Run it from PowerShell to see diagnostic details."
+        )
         return 1
 
 
