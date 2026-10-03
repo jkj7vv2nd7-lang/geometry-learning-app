@@ -892,7 +892,7 @@
       if (!cToolbar) return mode;
       var found = LAYOUT_MODES[0];
       LAYOUT_MODES.forEach(function (m) {
-        cToolbar.classList.toggle(m.cls, !!m.cls && m.key === mode);
+        if (m.cls) cToolbar.classList.toggle(m.cls, m.key === mode);
         if (m.key === mode) found = m;
       });
       if (layoutBtn) layoutBtn.textContent = found.icon;
