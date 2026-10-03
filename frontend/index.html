@@ -276,6 +276,38 @@
           </div>
         </section>
 
+        <!-- 探求コース（導入課題） -->
+        <section id="quest-section" aria-labelledby="quest-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b panel-drag-handle">
+            <h2 id="quest-heading" class="font-extrabold">🗺 探求コース（課題に挑戦）</h2>
+            <button id="quest-toggle-btn" type="button" class="tool-btn" aria-expanded="true" title="探求コースの表示／非表示">▼ 閉じる</button>
+          </div>
+          <div id="quest-body">
+            <div id="quest-filters" class="flex flex-wrap gap-1.5 px-3 py-2" role="group" aria-label="学年フィルタ">
+              <button type="button" data-quest-level="all" class="construct-tool construct-tool-active">全部</button>
+              <button type="button" data-quest-level="elem" class="construct-tool">小学校</button>
+              <button type="button" data-quest-level="junior" class="construct-tool">中学校</button>
+              <button type="button" data-quest-level="high" class="construct-tool">高校</button>
+            </div>
+            <div id="quest-list" class="p-3 grid gap-2 sm:grid-cols-2" aria-live="polite"></div>
+            <div id="quest-active" class="hidden p-3 border-t flex flex-col gap-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 id="quest-active-title" class="font-extrabold"></h3>
+                <button id="quest-back-btn" type="button" class="tool-btn" title="コース一覧に戻る">↩ 一覧</button>
+              </div>
+              <p id="quest-active-goal" class="text-sm"></p>
+              <ol id="quest-steps" class="space-y-1 text-sm"></ol>
+              <div class="flex flex-wrap gap-2">
+                <button id="quest-starter-btn" type="button" class="tool-btn hidden" title="お手本の土台を作図に配置">🧩 お手本を配置</button>
+                <button id="quest-hint-btn" type="button" class="tool-btn" title="ヒントを1つ見る">💡 ヒント</button>
+                <button id="quest-check-btn" type="button" class="tool-btn verify-btn" title="作図が課題を満たすか自動判定">🏁 できた！チェック</button>
+              </div>
+              <div id="quest-hints" class="text-sm space-y-1" aria-live="polite"></div>
+              <div id="quest-result" class="text-sm" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
+
         <!-- 立体図形（3D・ふだんは折りたたみ） -->
         <section id="solid-section" aria-labelledby="solid-heading" class="bg-white rounded-2xl shadow overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
@@ -398,6 +430,7 @@
   <!-- アプリロジック（描画エンジン → 制御の順で読込） -->
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="js/renderer.js" defer></script>
+  <script src="js/quests.js" defer></script>
   <script src="js/app.js" defer></script>
   <!-- 3D立体ビュー（three.jsモジュール） -->
   <script type="importmap">

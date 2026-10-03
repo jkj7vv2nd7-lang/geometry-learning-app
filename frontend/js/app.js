@@ -1218,6 +1218,203 @@
     });
   }
 
+  // ---------- 探求コース（導入課題・自動判定・進捗管理） ----------
+  var QUEST_STORE_KEY = 'quest-progress-v1';
+  var activeQuest = null;
+  var questFilter = 'all';
+  var questStepDone = [];
+  var questHintIdx = 0;
+
+  function loadQuestProgress() {
+    try { return JSON.parse(localStorage.getItem(QUEST_STORE_KEY) || '{}'); }
+    catch (_) { return {}; }
+  }
+  function renderQuestList() {
+    var box = $('quest-list');
+    if (!box || !window.QUESTS) return;
+    box.innerHTML = '';
+    var prog = loadQuestProgress();
+    window.QUESTS
+      .filter(function (q) { return questFilter === 'all' || q.level === questFilter; })
+      .forEach(function (q) {
+        var done = !!(prog[q.id] && prog[q.id].done);
+        var card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'quest-card' + (done ? ' quest-done' : '');
+        var h = document.createElement('h4');
+        h.textContent = (done ? '★ ' : '☆ ') + q.title;
+        var p = document.createElement('p');
+        p.textContent = q.levelLabel + '・' + q.unit;
+        card.appendChild(h);
+        card.appendChild(p);
+        (function (qq) { card.addEventListener('click', function () { openQuest(qq.id); }); })(q);
+        box.appendChild(card);
+      });
+  }
+  function openQuest(id) {
+    var q = null;
+    (window.QUESTS || []).forEach(function (x) { if (x.id === id) q = x; });
+    if (!q) return;
+    activeQuest = q;
+    questStepDone = q.steps.map(function () { return false; });
+    questHintIdx = 0;
+    $('quest-active-title').textContent = '🗺 ' + q.title + '（' + q.levelLabel + '・' + q.unit + '）';
+    $('quest-active-goal').textContent = '🎯 ' + q.goal;
+    var ol = $('quest-steps');
+    ol.innerHTML = '';
+    q.steps.forEach(function (s, i) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'quest-step';
+      b.textContent = (i + 1) + '. ' + s;
+      (function (idx, btn) {
+        btn.addEventListener('click', function () {
+          questStepDone[idx] = !questStepDone[idx];
+          btn.classList.toggle('quest-step-done', questStepDone[idx]);
+        });
+      })(i, b);
+      li.appendChild(b);
+      ol.appendChild(li);
+    });
+    $('quest-hints').innerHTML = '';
+    $('quest-result').innerHTML = '';
+    var st = $('quest-starter-btn');
+    if (st) st.classList.toggle('hidden', !q.starter);
+    $('quest-active').classList.remove('hidden');
+    $('quest-active').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function evaluateQuest(q, stats, verifyOut, discoverOut) {
+    return (q.checks || []).map(function (c) {
+      var ok = false, label = '';
+      if (c.kind === 'has_check') {
+        var hit = (verifyOut.checks || []).filter(function (x) {
+          return x.name.indexOf(c.name) >= 0 && x.passed;
+        })[0];
+        ok = !!hit;
+        label = '判定「' + c.name + '」' + (ok ? 'クリア' : '未達成（' + (hit ? '' : '条件を満たす作図にしよう') + '）');
+      } else if (c.kind === 'has_theorem') {
+        var th = (discoverOut.discoveries || []).filter(function (x) {
+          return x.theorem.indexOf(c.name) >= 0;
+        })[0];
+        ok = !!th;
+        label = '定理「' + c.name + '」の発見' + (ok ? 'クリア' : '未達成');
+      } else if (c.kind.indexOf('min_') === 0) {
+        var key = c.kind.slice(4);
+        var have = stats[key] || 0;
+        ok = have >= c.n;
+        label = { points: '点', segments: '線分', angles: '測定角', circles: '円', pbis: '中点垂線', bisectors: '二等分線', parallels: '平行線', traces: '軌跡' }[key] + have + '個（目標' + c.n + '個）';
+      }
+      return { label: label, ok: ok };
+    });
+  }
+  function initQuests() {
+    if (!window.QUESTS) return;
+    document.querySelectorAll('[data-quest-level]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        questFilter = btn.getAttribute('data-quest-level');
+        document.querySelectorAll('[data-quest-level]').forEach(function (b) {
+          b.classList.toggle('construct-tool-active', b === btn);
+        });
+        renderQuestList();
+      });
+    });
+    renderQuestList();
+    var back = $('quest-back-btn');
+    if (back) back.addEventListener('click', function () {
+      activeQuest = null;
+      $('quest-active').classList.add('hidden');
+    });
+    var hintBtn = $('quest-hint-btn');
+    if (hintBtn) hintBtn.addEventListener('click', function () {
+      if (!activeQuest) return;
+      var box = $('quest-hints');
+      if (questHintIdx < activeQuest.hints.length) {
+        var p = document.createElement('p');
+        p.textContent = '💡 ヒント' + (questHintIdx + 1) + '：' + activeQuest.hints[questHintIdx];
+        box.appendChild(p);
+        questHintIdx++;
+      } else {
+        addChatMessage('💡 ヒントは以上です。あとは自分で試してみよう！', 'ai');
+      }
+    });
+    var starterBtn = $('quest-starter-btn');
+    if (starterBtn) starterBtn.addEventListener('click', function () {
+      if (!activeQuest || !activeQuest.starter) return;
+      window.ConstructionBoard.load(JSON.parse(JSON.stringify(activeQuest.starter)));
+      addChatMessage('🧩 お手本の土台を配置しました。続きを作図してみよう！', 'ai');
+    });
+    var checkBtn = $('quest-check-btn');
+    if (checkBtn) checkBtn.addEventListener('click', handleQuestCheck);
+    var qt = $('quest-toggle-btn');
+    if (qt) qt.addEventListener('click', function () {
+      var body = $('quest-body');
+      if (!body) return;
+      var open = body.classList.contains('hidden');
+      body.classList.toggle('hidden', !open);
+      qt.textContent = open ? '▼ 閉じる' : '▶ 開く';
+      qt.setAttribute('aria-expanded', String(open));
+    });
+  }
+  async function handleQuestCheck() {
+    if (!activeQuest || !window.ConstructionBoard) return;
+    var data = window.ConstructionBoard.serialize();
+    var box = $('quest-result');
+    showLoading('課題の達成を判定中...');
+    try {
+      var grade = $('grade-select') ? $('grade-select').value : 'elementary-high';
+      var results = await Promise.all([
+        fetch(ENDPOINT_VERIFY, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ construction: data, query: activeQuest.goal, grade: grade })
+        }).then(function (r) { if (!r.ok) throw new Error('verify ' + r.status); return r.json(); }),
+        fetch(ENDPOINT_DISCOVER, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ construction: data, grade: grade })
+        }).then(function (r) { if (!r.ok) throw new Error('discover ' + r.status); return r.json(); })
+      ]);
+      var verdicts = evaluateQuest(activeQuest, window.ConstructionBoard.stats(), results[0], results[1]);
+      var allOk = verdicts.length > 0 && verdicts.every(function (v) { return v.ok; });
+      box.innerHTML = '';
+      verdicts.forEach(function (v) {
+        var p = document.createElement('p');
+        p.className = v.ok ? 'quest-check-ok' : 'quest-check-ng';
+        p.textContent = (v.ok ? '✅ ' : '⬜ ') + v.label;
+        box.appendChild(p);
+      });
+      if (allOk) {
+        var done = document.createElement('p');
+        done.className = 'quest-check-ok';
+        done.textContent = '🎉 課題クリア！ ' + activeQuest.complete;
+        box.appendChild(done);
+        var prog = loadQuestProgress();
+        prog[activeQuest.id] = { done: true, date: new Date().toLocaleString('ja-JP') };
+        try { localStorage.setItem(QUEST_STORE_KEY, JSON.stringify(prog)); } catch (_) {}
+        renderQuestList();
+        // 記録帳へ自動記録
+        try {
+          var arr = JSON.parse(localStorage.getItem(JOURNAL_STORE_KEY) || '[]');
+          arr.push({
+            time: new Date().toLocaleString('ja-JP'),
+            prediction: '【課題】' + activeQuest.title + '：' + activeQuest.goal,
+            checks: results[0].checks,
+            comment: results[1].report_md.slice(0, 500)
+          });
+          localStorage.setItem(JOURNAL_STORE_KEY, JSON.stringify(arr));
+          if (typeof renderJournal === 'function') renderJournal();
+        } catch (_) {}
+        addChatMessage('🎉 **' + activeQuest.title + ' クリア！**\n\n' + activeQuest.complete +
+          '\n\n記録帳にも保存しました。次のコースに進もう！', 'ai');
+      } else {
+        addChatMessage('🔍 あと少し！上の⬜の条件を満たすよう作図を続けてみよう。ヒントも使えるよ。', 'ai');
+      }
+    } catch (err) {
+      showError('課題判定に失敗しました: ' + err.message);
+    } finally {
+      hideLoading();
+    }
+  }
+
   function initMisc() {
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
@@ -1293,6 +1490,7 @@
     initHeartbeat();
     initLayout();
     initCommandPalette();
+    initQuests();
     initMisc();
     setStatus('待機中', null);
   });

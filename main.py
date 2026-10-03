@@ -241,6 +241,8 @@ async def verify_construction(req: VerifyRequest) -> VerifyResponse:
         "circles": [list(s) for s in c.circles],
         "perps": c.perps,
         "angles": [list(a) for a in c.angles],
+        "parallels": c.parallels,
+        "bisectors": [list(b) for b in c.bisectors],
     }
     raw_checks = solver.verify_construction(data)
     checks = [ConstructionCheck(**ch) for ch in raw_checks]

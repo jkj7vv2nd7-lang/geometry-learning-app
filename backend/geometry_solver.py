@@ -483,9 +483,19 @@ def verify_construction(data: Dict) -> List[Dict]:
                 break
         if not found:
             add("等しい長さ", False, "等しい長さの組はまだありません。")
-    # 平行・垂直な組
-    if len(segs) >= 2:
-        dirs = [(_seg_angle(pts, a, b), a, b) for a, b in segs]
+    # 平行・垂直な組（線分・直線・平行線ツール出力をすべて対象）
+    dirs = []
+    for a, b in segs:
+        if _seg_len(pts, a, b) >= 1.0:
+            dirs.append((_seg_angle(pts, a, b), a, b))
+    for s in (data.get("lines", []) or []):
+        if s[0] in pts and s[1] in pts and s[0] != s[1] and _seg_len(pts, s[0], s[1]) >= 1.0:
+            dirs.append((_seg_angle(pts, s[0], s[1]), s[0], s[1]))
+    for p in (data.get("parallels", []) or []):
+        a, b = p["seg"][0], p["seg"][1]
+        if a in pts and b in pts and a != b and _seg_len(pts, a, b) >= 1.0:
+            dirs.append((_seg_angle(pts, a, b), a, b))
+    if len(dirs) >= 2:
         para = perp = False
         for i in range(len(dirs)):
             for j in range(i + 1, len(dirs)):
