@@ -1207,7 +1207,92 @@
     };
   }
 
-  global.MathParser = { parse: parse };
+  /* 式トークン → LaTeX（教科書体表示用）。不正な式はthrow。KaTeX等で描画する。 */
+  var LATEX_FN = {
+    sin: '\\sin', cos: '\\cos', tan: '\\tan',
+    asin: '\\arcsin', acos: '\\arccos', atan: '\\arctan',
+    exp: '\\exp', log: '\\log', ln: '\\ln',
+    floor: '\\lfloor', ceil: '\\lceil',
+    round: '\\mathrm{round}', sign: '\\mathrm{sgn}'
+  };
+  function fmtNumLatex(v) {
+    if (v === Math.PI) return '\\pi ';
+    if (v === Math.E) return 'e';
+    return String(v);
+  }
+  function toLatex(expr) {
+    var tokens = tokenize(expr);
+    var pos = 0;
+    function peek() { return tokens[pos]; }
+    function parseExpr() {
+      var node = parseTerm();
+      var tk;
+      while ((tk = peek()) && tk.t === 'op' && (tk.v === '+' || tk.v === '-')) {
+        pos++;
+        node = node + tk.v + parseTerm();
+      }
+      return node;
+    }
+    function parseTerm() {
+      var node = parsePow();
+      var tk;
+      while ((tk = peek()) && tk.t === 'op' && (tk.v === '*' || tk.v === '/' || tk.v === '%')) {
+        pos++;
+        var rhs = parsePow();
+        if (tk.v === '*') node = node + ' \\cdot ' + rhs;
+        else if (tk.v === '/') node = '\\frac{' + node + '}{' + rhs + '}';
+        else node = node + ' \\bmod ' + rhs;
+      }
+      return node;
+    }
+    function parsePow() {
+      var base = parseUnary();
+      var tk = peek();
+      if (tk && tk.t === 'op' && tk.v === '^') {
+        pos++;
+        return base + '^{' + parseUnary() + '}';
+      }
+      return base;
+    }
+    function parseUnary() {
+      var tk = peek();
+      if (tk && tk.t === 'op' && (tk.v === '-' || tk.v === '+')) {
+        pos++;
+        var inner = parseUnary();
+        return tk.v === '-' ? '-' + inner : inner;
+      }
+      return parseAtom();
+    }
+    function parseAtom() {
+      var tk = tokens[pos++];
+      if (!tk) throw new Error('式が正しくありません');
+      if (tk.t === 'num') return fmtNumLatex(tk.v);
+      if (tk.t === 'x') return 'x';
+      if (tk.t === 'fn') {
+        var open = tokens[pos++];
+        if (!open || open.t !== 'par' || open.v !== '(') throw new Error('式が正しくありません');
+        var arg = parseExpr();
+        var close = tokens[pos++];
+        if (!close || close.t !== 'par' || close.v !== ')') throw new Error('式が正しくありません');
+        if (tk.v === 'sqrt') return '\\sqrt{' + arg + '}';
+        if (tk.v === 'cbrt') return '\\sqrt[3]{' + arg + '}';
+        if (tk.v === 'abs') return '\\left|' + arg + '\\right|';
+        return LATEX_FN[tk.v] + '\\left(' + arg + '\\right)';
+      }
+      if (tk.t === 'par' && tk.v === '(') {
+        var inner2 = parseExpr();
+        var c2 = tokens[pos++];
+        if (!c2 || c2.t !== 'par' || c2.v !== ')') throw new Error('式が正しくありません');
+        return '\\left(' + inner2 + '\\right)';
+      }
+      throw new Error('式が正しくありません');
+    }
+    var out = parseExpr();
+    if (pos !== tokens.length) throw new Error('式が正しくありません');
+    return out;
+  }
+
+  global.MathParser = { parse: parse, toLatex: toLatex };
 })(window);
 
 /* ============================================================
@@ -1225,7 +1310,7 @@
   var uid = 0;
 
   var funcs = []; // {id, expr, fn, color}
-  var visible = true;
+  var visible = false; // 初期は非表示（作図キャンバスをすっきり保つ）
   var onChange = null;
 
   function el(name, attrs, parent) {
@@ -1336,7 +1421,7 @@
     notify();
   }
   function notify() {
-    if (typeof onChange === 'function') { try { onChange(list()); } catch (_) {} }
+    if (typeof onChange === 'function') { try { onChange(list(), visible); } catch (_) {} }
   }
 
   function addFunction(expr) {
@@ -1346,6 +1431,7 @@
     var a = analyze(fn);
     F.zeros = a.zeros; F.yIntercept = a.yIntercept; F.ymin = a.ymin; F.ymax = a.ymax;
     funcs.push(F);
+    visible = true; // 関数追加時は座標を自動表示
     renderAll();
     return F;
   }

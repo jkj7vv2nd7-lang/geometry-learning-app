@@ -659,16 +659,36 @@
     if (!FG) return;
     var input = $('function-input');
 
-    function renderList() {
+    function renderList(providedList, isVisible) {
       var box = $('function-list');
+      var list = providedList || FG.list();
       if (!box) return;
+      if (typeof isVisible === 'boolean') syncGraphToggle(isVisible);
       box.innerHTML = '';
-      FG.list().forEach(function (F) {
+      list.forEach(function (F) {
         var chip = document.createElement('span');
-        chip.className = 'prompt-example-chip';
+        chip.className = 'prompt-example-chip function-chip';
         chip.style.borderColor = F.color;
-        chip.style.color = F.color;
-        chip.textContent = 'y = ' + F.expr + '（零点' + (F.zeros.length ? F.zeros.join(', ') : 'なし') + '） ✕';
+        // 数式は教科書体（KaTeX）で表示、失敗時はプレーンテキスト
+        var rendered = false;
+        if (window.katex) {
+          try {
+            var latex = 'y = ' + window.MathParser.toLatex(F.expr);
+            var ks = document.createElement('span');
+            window.katex.render(latex, ks, { throwOnError: false });
+            chip.appendChild(ks);
+            rendered = true;
+          } catch (_) { rendered = false; }
+        }
+        if (!rendered) {
+          var plain = document.createElement('span');
+          plain.textContent = 'y = ' + F.expr;
+          chip.appendChild(plain);
+        }
+        var meta = document.createElement('span');
+        meta.className = 'function-chip-meta';
+        meta.textContent = '（零点' + (F.zeros.length ? F.zeros.join(', ') : 'なし') + '） ✕';
+        chip.appendChild(meta);
         chip.title = 'クリックで削除';
         chip.setAttribute('role', 'button');
         chip.setAttribute('tabindex', '0');
@@ -679,6 +699,12 @@
         })(F.id);
         box.appendChild(chip);
       });
+    }
+    function syncGraphToggle(v) {
+      var tg = $('toggle-graph-btn');
+      if (!tg) return;
+      tg.textContent = v ? '📊 座標ON' : '📊 座標OFF';
+      tg.setAttribute('aria-pressed', String(v));
     }
     FG.setOnChange(renderList);
 

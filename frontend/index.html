@@ -20,6 +20,8 @@
   </script>
   <!-- 独自スタイル -->
   <link rel="stylesheet" href="css/style.css" />
+  <!-- KaTeX（数式の教科書体表示） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
 </head>
 <body data-mode="student" class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
 
@@ -211,7 +213,7 @@
               <span class="text-xs text-slate-500">y =</span>
               <input id="function-input" type="text" placeholder="例： x^2 - 2*x（sin・cos・sqrtも使えます）" class="flex-1 min-w-[180px] border rounded-xl px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:outline-none" />
               <button id="add-function-btn" type="button" class="tool-btn" title="グラフを追加">➕ 追加</button>
-              <button id="toggle-graph-btn" type="button" class="tool-btn" aria-pressed="true" title="座標・グラフの表示切替">📊 座標ON</button>
+              <button id="toggle-graph-btn" type="button" class="tool-btn" aria-pressed="false" title="座標・グラフの表示切替">📊 座標OFF</button>
               <button id="explain-graph-btn" type="button" class="tool-btn verify-btn" title="グラフの特徴をAIに解説してもらう">🤖 グラフAI解説</button>
             </div>
             <div id="function-list" class="flex flex-wrap gap-2" aria-live="polite"></div>
@@ -360,6 +362,7 @@
   </footer>
 
   <!-- アプリロジック（描画エンジン → 制御の順で読込） -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="js/renderer.js" defer></script>
   <script src="js/app.js" defer></script>
   <!-- 3D立体ビュー（three.jsモジュール） -->

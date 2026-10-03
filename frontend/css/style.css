@@ -91,6 +91,23 @@
   margin-bottom: 2px;
 }
 
+/* 関数チップ（KaTeX数式＋メタ情報） */
+.function-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  background: #fff;
+}
+.function-chip .katex {
+  font-size: 1.05em;
+}
+.function-chip-meta {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 700;
+}
+
 :root {
   /* 児童・生徒モード（青・水色ベース） */
   --student-primary: #2563eb;
