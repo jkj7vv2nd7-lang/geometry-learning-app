@@ -175,6 +175,40 @@
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
 }
 
+/* ============================================================
+ * 12. フローティングペイン（図を見ながら操作）
+ * ============================================================ */
+.float-panel {
+  position: fixed !important;
+  right: 12px;
+  width: min(380px, calc(100vw - 24px));
+  z-index: 40;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.32);
+  border: 2px solid #f59e00;
+  max-height: min(62vh, 560px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.float-panel > div:last-child,
+.float-panel > ol:last-child {
+  overflow-y: auto;
+}
+.float-panel .panel-drag-handle {
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+  background: linear-gradient(180deg, #fffbeb, #fef3c7);
+}
+.float-panel.float-dragging {
+  opacity: 0.92;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
+}
+#float-panels-btn.float-active {
+  background: #f59e00 !important;
+  color: #fff !important;
+}
+
 :root {
   /* 児童・生徒モード（青・水色ベース） */
   --student-primary: #2563eb;

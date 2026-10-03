@@ -891,6 +891,79 @@
     }
     wireCollapsible('chat-toggle-btn', 'chat-body', 'chatOpen', '▶ 開く', '▼ 閉じる');
     wireCollapsible('journal-toggle-btn', 'journal-body', 'journalOpen', '▶ 開く', '▼ 閉じる');
+
+    // フローティングペイン（解説・履歴・記録帳を図の上に重ねて操作）
+    var FLOAT_SECTIONS = ['chat-section', 'history-section', 'journal-section'];
+    function setFloatMode(on) {
+      var btn = $('float-panels-btn');
+      var savedPos = loadLayout().floatPos || {};
+      FLOAT_SECTIONS.forEach(function (id, idx) {
+        var sec = $(id);
+        if (!sec) return;
+        if (on) {
+          sec.classList.add('float-panel');
+          if (savedPos[id]) {
+            sec.style.left = savedPos[id].left;
+            sec.style.top = savedPos[id].top;
+            sec.style.right = 'auto';
+          } else {
+            sec.style.left = 'auto';
+            sec.style.right = '12px';
+            sec.style.top = (84 + idx * 48) + 'px';
+          }
+        } else {
+          sec.classList.remove('float-panel');
+          sec.style.left = ''; sec.style.top = ''; sec.style.right = '';
+        }
+      });
+      if (btn) {
+        btn.textContent = on ? '🪟 フロート中' : '🪟 フロート';
+        btn.classList.toggle('float-active', !!on);
+        btn.setAttribute('aria-pressed', String(!!on));
+      }
+    }
+    function makeFloatDraggable(id) {
+      var sec = $(id);
+      if (!sec) return;
+      var handle = sec.querySelector('.panel-drag-handle');
+      if (!handle) return;
+      handle.addEventListener('pointerdown', function (e) {
+        if (!sec.classList.contains('float-panel')) return;
+        if (e.target.closest('button')) return;
+        e.preventDefault();
+        var r = sec.getBoundingClientRect();
+        sec.style.left = r.left + 'px';
+        sec.style.top = r.top + 'px';
+        sec.style.right = 'auto';
+        var offX = e.clientX - r.left, offY = e.clientY - r.top;
+        sec.classList.add('float-dragging');
+        function mv(ev) {
+          sec.style.left = Math.max(0, Math.min(window.innerWidth - 80, ev.clientX - offX)) + 'px';
+          sec.style.top = Math.max(0, Math.min(window.innerHeight - 60, ev.clientY - offY)) + 'px';
+        }
+        function up() {
+          sec.classList.remove('float-dragging');
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          var pref = loadLayout();
+          var fp = pref.floatPos || {};
+          fp[id] = { left: sec.style.left, top: sec.style.top };
+          pref.floatPos = fp;
+          saveLayout(pref);
+        }
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+      });
+    }
+    FLOAT_SECTIONS.forEach(makeFloatDraggable);
+    setFloatMode(!!pref.floatMode);
+    var floatBtn = $('float-panels-btn');
+    if (floatBtn) floatBtn.addEventListener('click', function () {
+      var sec = $('chat-section');
+      var on = sec && !sec.classList.contains('float-panel');
+      setFloatMode(on);
+      saveLayout({ floatMode: on });
+    });
   }
 
   function initMisc() {
