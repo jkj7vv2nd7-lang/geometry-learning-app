@@ -837,6 +837,51 @@
       saveLayout({ toolsHidden: !show });
     });
 
+    // 作図バーの自由配置（グリップでドラッグ・ダブルクリックで元の位置に復帰）
+    var cToolbar = $('construct-toolbar');
+    var cGrip = $('construct-grip');
+    var cContainer = $('canvas-container');
+    function applyConstructBar() {
+      if (!cToolbar) return;
+      var pref = loadLayout().constructBar;
+      if (pref && pref.free) {
+        cToolbar.classList.add('construct-free');
+        cToolbar.style.left = pref.left || '';
+        cToolbar.style.top = pref.top || '';
+      } else {
+        cToolbar.classList.remove('construct-free');
+        cToolbar.style.left = ''; cToolbar.style.top = '';
+      }
+    }
+    applyConstructBar();
+    if (cGrip && cToolbar && cContainer) {
+      cGrip.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        var cRect = cContainer.getBoundingClientRect();
+        var r = cToolbar.getBoundingClientRect();
+        cToolbar.classList.add('construct-free');
+        cToolbar.style.left = (r.left - cRect.left) + 'px';
+        cToolbar.style.top = (r.top - cRect.top) + 'px';
+        var offX = e.clientX - r.left, offY = e.clientY - r.top;
+        var bw = r.width, bh = r.height;
+        function mv(ev) {
+          cToolbar.style.left = Math.max(0, Math.min(Math.max(0, cRect.width - bw), ev.clientX - cRect.left - offX)) + 'px';
+          cToolbar.style.top = Math.max(0, Math.min(Math.max(0, cRect.height - bh), ev.clientY - cRect.top - offY)) + 'px';
+        }
+        function up() {
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          saveLayout({ constructBar: { free: true, left: cToolbar.style.left, top: cToolbar.style.top } });
+        }
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+      });
+      cGrip.addEventListener('dblclick', function () {
+        saveLayout({ constructBar: { free: false } });
+        applyConstructBar();
+      });
+    }
+
     // 3D折りたたみ（初回展開時に遅延初期化・ヘッダーボタンと連動）
     var solidToggle = $('solid-toggle-btn');
     var solidBody = $('solid-body');

@@ -148,6 +148,37 @@
   transform: translateY(-8px);
   pointer-events: none;
 }
+/* 作図バー小型化＋自由配置 */
+#construct-toolbar .construct-tool,
+#construct-toolbar .tool-btn {
+  min-height: 34px;
+  min-width: 34px;
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 0.6rem;
+}
+#construct-toolbar.construct-free {
+  right: auto;
+  width: max-content;
+  max-width: calc(100% - 70px);
+}
+#construct-grip {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  font-size: 16px;
+  color: #94a3b8;
+  padding: 4px 6px;
+  border-radius: 0.5rem;
+  line-height: 1;
+}
+#construct-grip:hover {
+  background: #e2e8f0;
+  color: #475569;
+}
+#construct-grip:active {
+  cursor: grabbing;
+}
 #construct-tools-toggle {
   position: absolute;
   top: 8px;
