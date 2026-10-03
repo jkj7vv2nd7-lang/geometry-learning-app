@@ -353,6 +353,22 @@ body.teacher-mode .cmd-item-selected {
   font-size: 12px;
   color: #64748b;
 }
+.quest-learning-card {
+  border: 1px solid #dbeafe;
+  border-radius: 0.8rem;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+.quest-learning-card h4 {
+  margin-bottom: 3px;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+}
+.quest-learning-card p {
+  font-size: 13px;
+  line-height: 1.65;
+}
 .quest-step {
   width: 100%;
   text-align: left;

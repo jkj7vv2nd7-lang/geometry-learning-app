@@ -1222,9 +1222,45 @@
   var QUEST_STORE_KEY = 'quest-progress-v1';
   var activeQuest = null;
   var questFilter = 'all';
+  var questGradeFilter = 'all';
+  var questUnitFilter = 'all';
   var questStepDone = [];
   var questHintIdx = 0;
 
+  function questsForStage() {
+    return (window.QUESTS || []).filter(function (q) {
+      return questFilter === 'all' || q.level === questFilter;
+    });
+  }
+  function setQuestOptions(select, values, allLabel, selected) {
+    if (!select) return 'all';
+    var valid = values.indexOf(selected) >= 0;
+    select.innerHTML = '';
+    var all = document.createElement('option');
+    all.value = 'all';
+    all.textContent = allLabel;
+    select.appendChild(all);
+    values.forEach(function (value) {
+      var option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      select.appendChild(option);
+    });
+    select.value = valid ? selected : 'all';
+    return select.value;
+  }
+  function updateQuestFilters() {
+    var stageQuests = questsForStage();
+    var grades = stageQuests.map(function (q) { return q.grade; }).filter(Boolean);
+    grades = grades.filter(function (v, i) { return grades.indexOf(v) === i; });
+    questGradeFilter = setQuestOptions($('quest-grade-filter'), grades, 'すべての学年', questGradeFilter);
+    var unitQuests = stageQuests.filter(function (q) {
+      return questGradeFilter === 'all' || q.grade === questGradeFilter;
+    });
+    var units = unitQuests.map(function (q) { return q.unit; });
+    units = units.filter(function (v, i) { return units.indexOf(v) === i; });
+    questUnitFilter = setQuestOptions($('quest-unit-filter'), units, 'すべての単元', questUnitFilter);
+  }
   function loadQuestProgress() {
     try { return JSON.parse(localStorage.getItem(QUEST_STORE_KEY) || '{}'); }
     catch (_) { return {}; }
@@ -1232,10 +1268,14 @@
   function renderQuestList() {
     var box = $('quest-list');
     if (!box || !window.QUESTS) return;
+    updateQuestFilters();
     box.innerHTML = '';
     var prog = loadQuestProgress();
-    window.QUESTS
-      .filter(function (q) { return questFilter === 'all' || q.level === questFilter; })
+    questsForStage()
+      .filter(function (q) {
+        return (questGradeFilter === 'all' || q.grade === questGradeFilter) &&
+          (questUnitFilter === 'all' || q.unit === questUnitFilter);
+      })
       .forEach(function (q) {
         var done = !!(prog[q.id] && prog[q.id].done);
         var card = document.createElement('button');
@@ -1244,7 +1284,7 @@
         var h = document.createElement('h4');
         h.textContent = (done ? '★ ' : '☆ ') + q.title;
         var p = document.createElement('p');
-        p.textContent = q.levelLabel + '・' + q.unit;
+        p.textContent = q.grade + '・' + q.unit;
         card.appendChild(h);
         card.appendChild(p);
         (function (qq) { card.addEventListener('click', function () { openQuest(qq.id); }); })(q);
@@ -1258,8 +1298,26 @@
     activeQuest = q;
     questStepDone = q.steps.map(function () { return false; });
     questHintIdx = 0;
-    $('quest-active-title').textContent = '🗺 ' + q.title + '（' + q.levelLabel + '・' + q.unit + '）';
+    $('quest-active-title').textContent = '🗺 ' + q.title + '（' + q.grade + '・' + q.unit + '）';
     $('quest-active-goal').textContent = '🎯 ' + q.goal;
+    var context = $('quest-learning-context');
+    if (context) {
+      context.innerHTML = '';
+      [
+        ['導入', q.scenario], ['問い', q.question], ['着目点', q.focus],
+        ['予想', q.prediction], ['検証', q.validation], ['発見・まとめ', q.discovery]
+      ].forEach(function (item) {
+        var section = document.createElement('section');
+        section.className = 'quest-learning-card';
+        var heading = document.createElement('h4');
+        heading.textContent = item[0];
+        var text = document.createElement('p');
+        text.textContent = item[1];
+        section.appendChild(heading);
+        section.appendChild(text);
+        context.appendChild(section);
+      });
+    }
     var ol = $('quest-steps');
     ol.innerHTML = '';
     q.steps.forEach(function (s, i) {
@@ -1303,21 +1361,40 @@
         var key = c.kind.slice(4);
         var have = stats[key] || 0;
         ok = have >= c.n;
-        label = { points: '点', segments: '線分', angles: '測定角', circles: '円', pbis: '中点垂線', bisectors: '二等分線', parallels: '平行線', traces: '軌跡' }[key] + have + '個（目標' + c.n + '個）';
+        label = ({ points: '点', segments: '線分', angles: '測定角', circles: '円', perps: '垂線', pbis: '中点垂線', bisectors: '二等分線', parallels: '平行線', tangents: '接線', traces: '軌跡' }[key] || key) + have + '個（目標' + c.n + '個）';
       }
       return { label: label, ok: ok };
     });
   }
   function initQuests() {
     if (!window.QUESTS) return;
+    var teacherQuestBtn = $('teacher-quest-btn');
+    if (teacherQuestBtn) teacherQuestBtn.addEventListener('click', function () {
+      setMode('student');
+      var section = $('quest-section');
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     document.querySelectorAll('[data-quest-level]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         questFilter = btn.getAttribute('data-quest-level');
+        questGradeFilter = 'all';
+        questUnitFilter = 'all';
         document.querySelectorAll('[data-quest-level]').forEach(function (b) {
           b.classList.toggle('construct-tool-active', b === btn);
         });
         renderQuestList();
       });
+    });
+    var gradeFilter = $('quest-grade-filter');
+    if (gradeFilter) gradeFilter.addEventListener('change', function () {
+      questGradeFilter = gradeFilter.value;
+      questUnitFilter = 'all';
+      renderQuestList();
+    });
+    var unitFilter = $('quest-unit-filter');
+    if (unitFilter) unitFilter.addEventListener('change', function () {
+      questUnitFilter = unitFilter.value;
+      renderQuestList();
     });
     renderQuestList();
     var back = $('quest-back-btn');
@@ -1344,6 +1421,34 @@
       window.ConstructionBoard.load(JSON.parse(JSON.stringify(activeQuest.starter)));
       addChatMessage('🧩 お手本の土台を配置しました。続きを作図してみよう！', 'ai');
     });
+    var startBtn = $('quest-start-btn');
+    if (startBtn) startBtn.addEventListener('click', function () {
+      if (!activeQuest) return;
+      setMode('student');
+      var gradeSelect = $('grade-select');
+      if (gradeSelect) {
+        gradeSelect.value = activeQuest.level === 'junior' ? 'junior' :
+          activeQuest.level === 'high' ? 'high' :
+          activeQuest.grade.indexOf('小学校1年') === 0 || activeQuest.grade.indexOf('小学校2年') === 0 ||
+          activeQuest.grade.indexOf('小学校3年') === 0 ? 'elementary-low' : 'elementary-high';
+      }
+      var toolButton = document.querySelector('[data-construct-tool="' + (activeQuest.startTool || 'point') + '"]');
+      if (toolButton) toolButton.click();
+      var canvas = $('canvas-section');
+      if (canvas) canvas.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    var predictionBtn = $('quest-prediction-btn');
+    if (predictionBtn) predictionBtn.addEventListener('click', function () {
+      if (!activeQuest) return;
+      var input = $('journal-prediction-input');
+      if (input) {
+        var journalBody = $('journal-body');
+        if (journalBody && journalBody.classList.contains('hidden')) $('journal-toggle-btn').click();
+        input.value = activeQuest.prediction;
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
     var checkBtn = $('quest-check-btn');
     if (checkBtn) checkBtn.addEventListener('click', handleQuestCheck);
     var qt = $('quest-toggle-btn');
@@ -1360,20 +1465,33 @@
     if (!activeQuest || !window.ConstructionBoard) return;
     var data = window.ConstructionBoard.serialize();
     var box = $('quest-result');
-    showLoading('課題の達成を判定中...');
+    var needsRemote = (activeQuest.checks || []).some(function (check) {
+      return check.kind === 'has_check' || check.kind === 'has_theorem';
+    });
+    showLoading(needsRemote ? '課題の達成を判定中...' : '作図の数を確認中...');
     try {
       var grade = $('grade-select') ? $('grade-select').value : 'elementary-high';
-      var results = await Promise.all([
-        fetch(ENDPOINT_VERIFY, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ construction: data, query: activeQuest.goal, grade: grade })
-        }).then(function (r) { if (!r.ok) throw new Error('verify ' + r.status); return r.json(); }),
-        fetch(ENDPOINT_DISCOVER, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ construction: data, grade: grade })
-        }).then(function (r) { if (!r.ok) throw new Error('discover ' + r.status); return r.json(); })
-      ]);
-      var verdicts = evaluateQuest(activeQuest, window.ConstructionBoard.stats(), results[0], results[1]);
+      var results = [null, null];
+      if (needsRemote) {
+        results = await Promise.all([
+          fetch(ENDPOINT_VERIFY, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ construction: data, query: activeQuest.goal, grade: grade })
+          }).then(function (r) { if (!r.ok) throw new Error('verify ' + r.status); return r.json(); }),
+          fetch(ENDPOINT_DISCOVER, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ construction: data, grade: grade })
+          }).then(function (r) { if (!r.ok) throw new Error('discover ' + r.status); return r.json(); })
+        ]);
+      }
+      var verdicts = evaluateQuest(activeQuest, window.ConstructionBoard.stats(), results[0] || { checks: [] }, results[1] || { discoveries: [] });
+      if (!needsRemote) {
+        var completedSteps = questStepDone.filter(function (done) { return done; }).length;
+        verdicts.push({
+          label: '探究手順 ' + completedSteps + '/' + questStepDone.length + '項目を確認',
+          ok: completedSteps === questStepDone.length
+        });
+      }
       var allOk = verdicts.length > 0 && verdicts.every(function (v) { return v.ok; });
       box.innerHTML = '';
       verdicts.forEach(function (v) {
@@ -1397,8 +1515,8 @@
           arr.push({
             time: new Date().toLocaleString('ja-JP'),
             prediction: '【課題】' + activeQuest.title + '：' + activeQuest.goal,
-            checks: results[0].checks,
-            comment: results[1].report_md.slice(0, 500)
+            checks: results[0] ? results[0].checks : verdicts.map(function (v) { return { name: v.label, passed: v.ok }; }),
+            comment: results[1] ? results[1].report_md.slice(0, 500) : activeQuest.discovery
           });
           localStorage.setItem(JOURNAL_STORE_KEY, JSON.stringify(arr));
           if (typeof renderJournal === 'function') renderJournal();

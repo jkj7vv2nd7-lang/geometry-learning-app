@@ -283,11 +283,23 @@
             <button id="quest-toggle-btn" type="button" class="tool-btn" aria-expanded="true" title="探求コースの表示／非表示">▼ 閉じる</button>
           </div>
           <div id="quest-body">
-            <div id="quest-filters" class="flex flex-wrap gap-1.5 px-3 py-2" role="group" aria-label="学年フィルタ">
+            <div id="quest-filters" class="flex flex-wrap gap-1.5 px-3 py-2" role="group" aria-label="学校段階フィルタ">
               <button type="button" data-quest-level="all" class="construct-tool construct-tool-active">全部</button>
               <button type="button" data-quest-level="elem" class="construct-tool">小学校</button>
               <button type="button" data-quest-level="junior" class="construct-tool">中学校</button>
               <button type="button" data-quest-level="high" class="construct-tool">高校</button>
+            </div>
+            <div class="grid gap-2 px-3 pb-2 sm:grid-cols-2">
+              <label class="text-xs font-bold">学年
+                <select id="quest-grade-filter" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
+                  <option value="all">すべての学年</option>
+                </select>
+              </label>
+              <label class="text-xs font-bold">単元
+                <select id="quest-unit-filter" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
+                  <option value="all">すべての単元</option>
+                </select>
+              </label>
             </div>
             <div id="quest-list" class="p-3 grid gap-2 sm:grid-cols-2" aria-live="polite"></div>
             <div id="quest-active" class="hidden p-3 border-t flex flex-col gap-2">
@@ -296,8 +308,11 @@
                 <button id="quest-back-btn" type="button" class="tool-btn" title="コース一覧に戻る">↩ 一覧</button>
               </div>
               <p id="quest-active-goal" class="text-sm"></p>
+              <div id="quest-learning-context" class="grid gap-2 sm:grid-cols-2"></div>
               <ol id="quest-steps" class="space-y-1 text-sm"></ol>
               <div class="flex flex-wrap gap-2">
+                <button id="quest-start-btn" type="button" class="tool-btn verify-btn" title="作図キャンバスへ移動して課題を試す">✏️ 作図キャンバスで試す</button>
+                <button id="quest-prediction-btn" type="button" class="tool-btn" title="予想を記録帳の入力欄へ送る">📓 予想を記録帳へ</button>
                 <button id="quest-starter-btn" type="button" class="tool-btn hidden" title="お手本の土台を作図に配置">🧩 お手本を配置</button>
                 <button id="quest-hint-btn" type="button" class="tool-btn" title="ヒントを1つ見る">💡 ヒント</button>
                 <button id="quest-check-btn" type="button" class="tool-btn verify-btn" title="作図が課題を満たすか自動判定">🏁 できた！チェック</button>
@@ -340,6 +355,13 @@
 
       <!-- ===== 教師モード表示 ===== -->
       <div id="teacher-view" role="tabpanel" aria-labelledby="mode-teacher-btn" class="hidden flex-col gap-4">
+        <section class="bg-white rounded-2xl shadow p-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="font-extrabold">🗺 図形探究課題ライブラリ</h2>
+            <p class="text-sm text-slate-600">学年・単元別の課題を選び、作図活動や授業導入に活用できます。</p>
+          </div>
+          <button id="teacher-quest-btn" type="button" class="tool-btn">課題を選ぶ・作図する</button>
+        </section>
         <!-- タブバー -->
         <div id="teacher-tabs" role="tablist" aria-label="教師用出力タブ" class="bg-white rounded-2xl shadow p-2 flex flex-col sm:flex-row gap-2">
           <button id="tab-lesson-plan" role="tab" aria-selected="true" aria-controls="panel-lesson-plan" data-teacher-tab="lesson-plan" class="teacher-tab teacher-tab-active">📝 指導案出力</button>
