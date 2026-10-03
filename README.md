@@ -33,6 +33,8 @@
 ```text
 geometry-learning-app/
 ├── main.py                  # FastAPIエントリーポイント（API＋静的ファイル配信）
+├── launcher.py              # Windows向けローカルEXEランチャー
+├── geometry-learning-app.spec # PyInstaller one-folderビルド設定
 ├── requirements.txt         # 依存ライブラリ
 ├── README.md                # 本ドキュメント
 ├── MANUAL.md                # 取扱マニュアル（利用者向け詳細手順）
@@ -41,6 +43,7 @@ geometry-learning-app/
 ├── tailwind.config.cjs      # Tailwind CSSのローカルビルド設定
 ├── .github/workflows/quality.yml # push/PR時の品質ゲート
 ├── scripts/
+│   ├── build-windows-launcher.ps1 # Windows配布フォルダのビルド
 │   └── copy-vendor-assets.js # KaTeX・Three.jsをローカル配信フォルダへコピー
 ├── playwright.config.js     # ローカルFastAPI連携設定
 ├── backend/
@@ -105,6 +108,18 @@ uvicorn main:app --reload --port 8000
 ブラウザで **http://localhost:8000** を開いてください。
 
 Windowsでは、Pythonと依存関係を準備後に `start-app.bat` をダブルクリックしても起動できます。終了は `stop-app.bat`、再起動は `restart-app.bat` です。
+
+### Windows単体ランチャー（EXE）
+
+Python環境がないWindows端末向けに、Python実行環境・FastAPI/Uvicorn・AI SDKとフロントエンド資産を含むone-folder形式の配布物を作成できます。ビルドするWindows PCにはPython 3.10以上とインターネット接続が必要です（依存ライブラリとPyInstallerをインストールします）。リポジトリのルートでPowerShellを開き、次を実行してください。
+
+```powershell
+.\scripts\build-windows-launcher.ps1
+```
+
+配布するときは `dist\GeometryLearningApp\` フォルダ全体をコピーします。`GeometryLearningApp.exe` だけを取り出さず、同じフォルダ内の `_internal` などのファイルも一緒に配布してください。利用者はフォルダ内の `GeometryLearningApp.exe` を実行します。サーバーは `127.0.0.1:8000` のみにバインドし、起動したコンソールを閉じずに使います。終了はそのコンソールで **Ctrl+C** を押してください。ポート8000が利用中なら明示的なエラーで終了します。別ポートを使う場合は、PowerShellから `.\GeometryLearningApp.exe --port 8001` のように起動します。
+
+図形の計算・探究機能はAPIキーなしで利用できます。AI機能を使う場合は、起動前に利用者自身の環境変数 `GEMINI_API_KEY` または `OPENAI_API_KEY` を設定してください。キーはビルドにも配布物にも含まれず、ランチャーは起動元プロセスの環境変数を引き継ぎます。例えばPowerShellでは `$env:GEMINI_API_KEY = "利用者自身のキー"` を設定してからEXEを実行します。EXEは未署名のため、Windows SmartScreenの警告が表示される場合があります。現時点ではコード署名を行っていません。
 
 ### オフライン利用と課題パック
 
