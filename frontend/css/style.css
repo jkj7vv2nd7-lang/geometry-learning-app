@@ -188,6 +188,140 @@
 #construct-layout-btn:hover {
   border-color: #f59e00;
 }
+
+/* バー形状：スピードダイヤル（FABタップで展開） */
+#construct-dial-fab {
+  display: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-size: 22px;
+  background: #f59e00;
+  color: #fff;
+  border: 2px solid #b45309;
+  box-shadow: 0 6px 16px rgba(245, 158, 0, 0.5);
+  cursor: pointer;
+  place-items: center;
+  transition: transform 0.2s ease;
+}
+#construct-dial-fab:hover {
+  transform: scale(1.08) rotate(-8deg);
+}
+#construct-toolbar.layout-dial {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  padding: 4px;
+}
+#construct-toolbar.layout-dial > *:not(#construct-grip):not(#construct-layout-btn):not(#construct-dial-fab) {
+  display: none;
+}
+#construct-toolbar.layout-dial > #construct-dial-fab {
+  display: grid;
+}
+#construct-toolbar.layout-dial.dial-open {
+  background: rgba(248, 250, 252, 0.97);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.3);
+  padding: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  width: max-content;
+  max-width: calc(100% - 70px);
+  max-height: 320px;
+}
+#construct-toolbar.layout-dial.dial-open > *:not(input) {
+  display: flex;
+}
+#construct-toolbar.layout-dial.dial-open > button {
+  animation: dial-pop 0.16s ease backwards;
+}
+@keyframes dial-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+ * 13. コマンドパレット（Ctrl+K）
+ * ============================================================ */
+#cmd-palette.hidden {
+  display: none;
+}
+#cmd-box {
+  position: absolute;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.4);
+  overflow: hidden;
+  animation: cmd-in 0.15s ease;
+}
+@keyframes cmd-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+#cmd-input {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 16px;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  outline: none;
+}
+#cmd-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.cmd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-radius: 0.7rem;
+  cursor: pointer;
+  font-size: 14px;
+  border: none;
+  background: transparent;
+}
+.cmd-item:hover,
+.cmd-item-selected {
+  background: #eff6ff;
+}
+body[data-mode="teacher"] .cmd-item:hover,
+body.teacher-mode .cmd-item:hover,
+body[data-mode="teacher"] .cmd-item-selected,
+body.teacher-mode .cmd-item-selected {
+  background: #ecfdf5;
+}
+.cmd-item .cmd-key {
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+#cmd-hint {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 11px;
+  color: #94a3b8;
+  border-top: 1px solid #f1f5f9;
+}
 #construct-grip {
   cursor: grab;
   touch-action: none;

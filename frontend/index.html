@@ -156,6 +156,7 @@
               <span id="backend-status" class="status-dot" title="バックエンド接続状態">● 待機中</span>
               <button id="reset-view-btn" type="button" class="tool-btn">⟲ 表示リセット</button>
               <button id="toggle-measure-btn" type="button" class="tool-btn" aria-pressed="true">📏 計測表示 ON</button>
+              <button id="cmd-palette-btn" type="button" class="tool-btn" title="コマンドパレット（Ctrl+K）">⌨ コマンド</button>
             </div>
           </div>
 
@@ -164,7 +165,8 @@
             <button id="construct-tools-toggle" type="button" title="作図ツールを表示／隠す">🛠</button>
             <div id="construct-toolbar" class="flex flex-wrap items-center gap-1.5 px-3 py-2" role="toolbar" aria-label="作図ツール">
               <span id="construct-grip" title="ドラッグで移動・ダブルクリックで元の位置に戻す">⠿</span>
-              <button id="construct-layout-btn" type="button" title="バーの形を変える（横長→正方形→縦長）">◫</button>
+              <button id="construct-layout-btn" type="button" title="バーの形を変える（横長→正方形→縦長→ダイヤル）">◫</button>
+              <button id="construct-dial-fab" type="button" title="作図ツールを開く／閉じる">🛠</button>
               <button id="tool-select" type="button" data-construct-tool="select" class="construct-tool construct-tool-active" title="選択・移動（点ドラッグで変形）">👆 選択</button>
               <button id="tool-point" type="button" data-construct-tool="point" class="construct-tool" title="点を打つ">● 点</button>
               <button id="tool-segment" type="button" data-construct-tool="segment" class="construct-tool" title="2点を結ぶ線分">📏 線分</button>
@@ -373,6 +375,16 @@
         <div class="bg-white rounded-2xl px-8 py-6 text-center shadow-2xl">
           <div class="loader mx-auto mb-3"></div>
           <p id="loading-text" class="font-bold">図形を生成しています…</p>
+        </div>
+      </div>
+
+      <!-- コマンドパレット（Ctrl+K） -->
+      <div id="cmd-palette" class="hidden fixed inset-0 z-50" role="dialog" aria-label="コマンドパレット">
+        <div id="cmd-backdrop" class="absolute inset-0 bg-black/40"></div>
+        <div id="cmd-box">
+          <input id="cmd-input" type="text" placeholder="コマンドを入力…（例：検証・保存・立体）" aria-label="コマンド検索" />
+          <ul id="cmd-list" role="listbox" aria-label="コマンド一覧"></ul>
+          <p id="cmd-hint">↑↓ 選択 ・ Enter 実行 ・ Esc 閉じる</p>
         </div>
       </div>
 

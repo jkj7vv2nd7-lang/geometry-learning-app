@@ -431,6 +431,8 @@
         document.querySelectorAll('[data-construct-tool]').forEach(function (b) {
           b.classList.toggle('construct-tool-active', b === btn);
         });
+        var tb = $('construct-toolbar');
+        if (tb) tb.classList.remove('dial-open'); // ダイヤル表示では選択後に閉じる
         setStatus('作図中: ' + btn.textContent.trim(), null);
       });
     });
@@ -559,10 +561,11 @@
     // 定理レポート
     var dc = $('discover-btn');
     if (dc) dc.addEventListener('click', handleDiscoverTheorems);
-    // キーボードショートカット（入力欄 focus 中は無効）
+    // キーボードショートカット（入力欄 focus 中・パレット表示中は無効）
     document.addEventListener('keydown', function (e) {
       var tag = (e.target && e.target.tagName) || '';
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
+      if (window.__cmdPaletteOpen && window.__cmdPaletteOpen()) return;
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault();
         if (!CB.undo()) addChatMessage('↩ もどれる手順はもうありません。', 'ai');
@@ -945,7 +948,8 @@
     var LAYOUT_MODES = [
       { key: 'row', icon: '▬', cls: '' },
       { key: 'grid', icon: '◫', cls: 'layout-grid' },
-      { key: 'col', icon: '▮', cls: 'layout-col' }
+      { key: 'col', icon: '▮', cls: 'layout-col' },
+      { key: 'dial', icon: '🔘', cls: 'layout-dial' }
     ];
     function applyConstructLayout(mode) {
       if (!cToolbar) return mode;
@@ -968,6 +972,27 @@
     }
     var savedMode = loadLayout().constructLayout || 'row';
     savedMode = applyConstructLayout(savedMode);
+    // スピードダイヤルFABの開閉
+    var dialFab = $('construct-dial-fab');
+    function setDialOpen(open) {
+      if (!cToolbar) return;
+      cToolbar.classList.toggle('dial-open', !!open);
+      if (open) {
+        var i = 0;
+        cToolbar.querySelectorAll('button').forEach(function (b) {
+          if (b.id === 'construct-dial-fab') return;
+          b.style.animationDelay = (i * 22) + 'ms';
+          i++;
+        });
+      }
+    }
+    if (dialFab) dialFab.addEventListener('click', function () {
+      setDialOpen(!cToolbar.classList.contains('dial-open'));
+    });
+    // ダイヤル表示ではツール選択後に自動で閉じる
+    if (layoutBtn) layoutBtn.addEventListener('click', function () {
+      setDialOpen(false);
+    });
     if (layoutBtn) layoutBtn.addEventListener('click', function () {
       var cur = loadLayout().constructLayout || 'row';
       var idx = 0;
@@ -1106,6 +1131,93 @@
     });
   }
 
+  // ---------- コマンドパレット（Ctrl+K：最近風の操作集約） ----------
+  function initCommandPalette() {
+    var overlay = $('cmd-palette'), input = $('cmd-input'), list = $('cmd-list');
+    if (!overlay || !input || !list) return;
+    function clickEl(id) { var b = $(id); if (b) b.click(); }
+    var COMMANDS = [
+      { label: '図形を生成・探求する', key: '生成', run: function () { clickEl('generate-btn'); } },
+      { label: '作図をAI検証', key: '検証', run: function () { handleVerifyConstruction(); } },
+      { label: '定理レポート', key: '定理', run: function () { handleDiscoverTheorems(); } },
+      { label: '作図を保存（JSON）', key: '保存', run: function () { clickEl('construct-save-btn'); } },
+      { label: '作図を読込', key: '読込', run: function () { clickEl('construct-load-btn'); } },
+      { label: '作図を画像保存（PNG）', key: 'PNG', run: function () { clickEl('construct-png-btn'); } },
+      { label: '1手もどる', key: 'Ctrl+Z', run: function () { var CB = window.ConstructionBoard; if (CB) CB.undo(); } },
+      { label: 'やりなおし', key: 'Ctrl+Y', run: function () { var CB = window.ConstructionBoard; if (CB) CB.redo(); } },
+      { label: 'グラフ座標の表示切替', key: '座標', run: function () { clickEl('toggle-graph-btn'); } },
+      { label: 'グラフをAI解説', key: 'グラフ', run: function () { handleExplainGraph(); } },
+      { label: '立体図形の開閉', key: '3D', run: function () { clickEl('solid-toggle-btn'); } },
+      { label: 'フロート表示の切替', key: '重ねる', run: function () { clickEl('float-panels-btn'); } },
+      { label: '左パネルの表示切替', key: '入力欄', run: function () { clickEl('toggle-panel-btn'); } },
+      { label: '児童・生徒モードに切替', key: 'モード', run: function () { clickEl('mode-student-btn'); } },
+      { label: '教師モードに切替', key: 'モード', run: function () { clickEl('mode-teacher-btn'); } },
+      { label: 'チャットに移動（質問する）', key: '質問', run: function () {
+        var c = $('chat-input');
+        if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.focus(); }
+      } }
+    ];
+    var sel = 0, shown = COMMANDS.slice();
+    function render() {
+      list.innerHTML = '';
+      if (!shown.length) { list.innerHTML = '<li class="cmd-item">見つかりません</li>'; return; }
+      shown.forEach(function (c, i) {
+        var li = document.createElement('li');
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cmd-item' + (i === sel ? ' cmd-item-selected' : '');
+        b.setAttribute('role', 'option');
+        var nm = document.createElement('span');
+        nm.textContent = c.label;
+        var k = document.createElement('span');
+        k.className = 'cmd-key';
+        k.textContent = c.key;
+        b.appendChild(nm);
+        b.appendChild(k);
+        (function (cmd) { b.addEventListener('click', function () { close(); cmd.run(); }); })(c);
+        li.appendChild(b);
+        list.appendChild(li);
+      });
+      var active = list.children[sel];
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+    }
+    function open() {
+      overlay.classList.remove('hidden');
+      input.value = ''; sel = 0; shown = COMMANDS.slice();
+      render();
+      setTimeout(function () { input.focus(); }, 30);
+    }
+    function close() { overlay.classList.add('hidden'); }
+    function isOpen() { return !overlay.classList.contains('hidden'); }
+    window.__cmdPaletteOpen = isOpen;
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      sel = 0;
+      shown = q ? COMMANDS.filter(function (c) {
+        return (c.label + ' ' + c.key).toLowerCase().indexOf(q) >= 0;
+      }) : COMMANDS.slice();
+      render();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(shown.length - 1, sel + 1); render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(0, sel - 1); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (shown[sel]) { var c = shown[sel]; close(); c.run(); } }
+      else if (e.key === 'Escape') { close(); }
+    });
+    var backdrop = $('cmd-backdrop');
+    if (backdrop) backdrop.addEventListener('click', close);
+    var openBtn = $('cmd-palette-btn');
+    if (openBtn) openBtn.addEventListener('click', open);
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        if (isOpen()) close(); else open();
+      } else if (e.key === 'Escape' && isOpen()) {
+        close();
+      }
+    });
+  }
+
   function initMisc() {
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
@@ -1180,6 +1292,7 @@
     initFunctionGraph();
     initHeartbeat();
     initLayout();
+    initCommandPalette();
     initMisc();
     setStatus('待機中', null);
   });
