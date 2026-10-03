@@ -14,6 +14,7 @@
   var ENDPOINT_DISCOVER = API_BASE + '/api/discover-theorems';
   var CONSTRUCT_STORE_KEY = 'construction-v1';
   var JOURNAL_STORE_KEY = 'journal-v1';
+  var TASK_PACK_STORE_KEY = 'student-task-pack-v1';
   var lastVerify = null; // 記録帳用：最新のAI検証結果
 
   // ---------- ヘルパー ----------
@@ -22,6 +23,53 @@
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function parseTaskPack(raw, quests) {
+    var pack = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!pack || pack.type !== 'geometry-quest-pack' || pack.schemaVersion !== 1 ||
+        !Array.isArray(pack.questIds) || !pack.questIds.length) {
+      throw new Error('対応している課題パックではありません。教師から受け取ったJSONを選んでください。');
+    }
+    var available = quests.map(function (quest) { return quest.id; });
+    var ids = pack.questIds.filter(function (id, index) {
+      return typeof id === 'string' && available.indexOf(id) >= 0 && pack.questIds.indexOf(id) === index;
+    });
+    if (ids.length !== pack.questIds.length) {
+      throw new Error('課題パックに現在の課題ライブラリと一致しないIDまたは重複があります。');
+    }
+    return { questIds: ids, title: typeof pack.title === 'string' ? pack.title.slice(0, 100) : '授業課題パック' };
+  }
+
+  function downloadTaskPack(ids, title) {
+    var pack = {
+      type: 'geometry-quest-pack',
+      schemaVersion: 1,
+      title: title,
+      exportedAt: new Date().toISOString(),
+      questIds: ids.slice()
+    };
+    downloadFile((title || '授業課題パック') + '.json', JSON.stringify(pack, null, 2), 'application/json;charset=utf-8');
+  }
+
+  function initConnectivity() {
+    var status = $('connection-status');
+    function update() {
+      if (!status) return;
+      var offline = !navigator.onLine;
+      status.hidden = !offline;
+      status.textContent = offline
+        ? 'オフラインです。課題・作図・保存済み記録は利用できます。AI解説・AI判定などサーバー機能は利用できません。'
+        : '';
+    }
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    update();
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      navigator.serviceWorker.register('/service-worker.js').catch(function (error) {
+        console.warn('オフライン用ページの登録に失敗しました:', error);
+      });
+    }
   }
 
   /** 最小限のMarkdown→HTML（見出し・太字・リスト・改行・表の簡易対応） */
@@ -65,7 +113,7 @@
     var st = $('backend-status');
     if (!st) return;
     st.textContent = '● ' + text;
-    st.style.color = ok === true ? '#059669' : ok === false ? '#dc2626' : '#64748b';
+    st.style.color = ok === true ? '#059669' : ok === false ? '#dc2626' : '#475569';
   }
 
   function showLoading(msg) {
@@ -1586,6 +1634,8 @@
   var questHintIdx = 0;
   var questDraftTimer = null;
   var preserveQuestDraftUntil = 0;
+  var questPackIds = null;
+  var questPackTitle = '';
   function questDraftKey(id) { return 'quest-draft-v1-' + id; }
   function readQuestDraft(id) {
     try {
@@ -1622,7 +1672,8 @@
 
   function questsForStage() {
     return (window.QUESTS || []).filter(function (q) {
-      return questFilter === 'all' || q.level === questFilter;
+      return (!questPackIds || questPackIds.indexOf(q.id) >= 0) &&
+        (questFilter === 'all' || q.level === questFilter);
     });
   }
   function setQuestOptions(select, values, allLabel, selected) {
@@ -1843,6 +1894,10 @@
         '思考・判断・表現: 予想を立て、複数の例や反例を用いて関係を説明している。',
         '主体的に学習に取り組む態度: 点や図形を動かして確かめ、予想を振り返っている。',
         '', '## 教師用メモ', '観察・測定の結果と、性質が成り立つ理由を区別して説明させます。',
+        'カリキュラム参照: ' + q.curriculum.reference,
+        '既習事項の目安: ' + q.curriculum.priorKnowledge,
+        '評価の証拠: ' + q.curriculum.assessmentEvidence,
+        q.curriculum.allocationNote,
         '課題画面の自動チェックは作図要素と学習手順の確認です。数学的な証明や理解度評価の代わりにはなりません。');
     }
     return lines.join('\n');
@@ -1882,6 +1937,21 @@
       coverage.textContent = '自動確認: ' + assessmentScopeText(q) +
         '。作図チェックは証明・理解度の評価ではありません。';
       preview.appendChild(coverage);
+      var curriculum = q.curriculum;
+      if (curriculum) {
+        [
+          ['カリキュラム参照', curriculum.reference],
+          ['既習事項の目安', curriculum.priorKnowledge],
+          ['学習の焦点', curriculum.learningFocus],
+          ['評価の証拠', curriculum.assessmentEvidence],
+          ['配当の注意', curriculum.allocationNote]
+        ].forEach(function (item) {
+          var note = document.createElement('p');
+          note.className = 'text-xs text-slate-600 mb-2';
+          note.textContent = item[0] + ': ' + item[1];
+          preview.appendChild(note);
+        });
+      }
       [
         ['授業の流れ', q.lessonPlan.phases.map(function (phase) { return phase.minutes + '分 ' + phase.label; }).join('／')],
         ['発問例', q.lessonPlan.teacherPrompts.join(' / ')],
@@ -1916,7 +1986,34 @@
       });
       preview.appendChild(steps);
     }
-    select.addEventListener('change', renderPreview);
+      var curriculumRows = $('teacher-curriculum-rows');
+      var curriculumSummary = $('teacher-curriculum-summary');
+      if (curriculumRows && curriculumSummary) {
+        curriculumRows.innerHTML = '';
+        ['elem', 'junior', 'high'].forEach(function (level) {
+          var label = level === 'elem' ? '小学校' : level === 'junior' ? '中学校' : '高校';
+          var count = sorted.filter(function (q) { return q.level === level; }).length;
+          curriculumSummary.textContent += (curriculumSummary.textContent ? '　／　' : '') + label + ' ' + count + '課題';
+        });
+        sorted.forEach(function (q) {
+          var data = q.curriculum;
+          var row = document.createElement('tr');
+          [
+            q.grade + '・' + q.unit + '／' + q.title,
+            data.reference,
+            data.priorKnowledge,
+            data.learningFocus + ' 評価: ' + data.assessmentEvidence,
+            data.lessonMinutes + '分'
+          ].forEach(function (value) {
+            var cell = document.createElement('td');
+            cell.className = 'p-2 border align-top';
+            cell.textContent = value;
+            row.appendChild(cell);
+          });
+          curriculumRows.appendChild(row);
+        });
+      }
+      select.addEventListener('change', renderPreview);
     renderPreview();
     var downloadBtn = $('teacher-quest-download-btn');
     var audienceSelect = $('teacher-worksheet-audience');
@@ -2044,6 +2141,30 @@
       downloadFile('図形探究-授業セット-' + audience + '.md', lessonSetMarkdown(audience), 'text/markdown;charset=utf-8');
       setStatus('授業セットをMarkdownで保存しました。');
     });
+    var downloadPack = $('teacher-lesson-pack-btn');
+    if (downloadPack) downloadPack.addEventListener('click', function () {
+      if (!lessonSet.length) { setStatus('課題パックにする課題を授業セットに追加してください。'); return; }
+      downloadTaskPack(lessonSet, '図形探究-授業課題パック');
+      setStatus('授業セットの' + lessonSet.length + '課題を学習者用JSONパックとして保存しました。');
+    });
+    var importPackButton = $('teacher-lesson-pack-import-btn');
+    var importPackInput = $('teacher-lesson-pack-input');
+    if (importPackButton && importPackInput) {
+      importPackButton.addEventListener('click', function () { importPackInput.click(); });
+      importPackInput.addEventListener('change', function () {
+        var file = importPackInput.files && importPackInput.files[0];
+        if (!file) return;
+        file.text().then(function (text) {
+          var pack = parseTaskPack(text, sorted);
+          lessonSet = pack.questIds;
+          renderLessonSet();
+          localStorage.setItem(LESSON_SET_STORE_KEY, JSON.stringify(lessonSet));
+          setStatus('課題パック「' + pack.title + '」から' + lessonSet.length + '課題を授業セットに読み込みました。');
+        }).catch(function (error) {
+          setStatus('課題パックを読み込めませんでした: ' + error.message);
+        }).finally(function () { importPackInput.value = ''; });
+      });
+    }
     renderLessonSet();
     var openBtn = $('teacher-quest-open-btn');
     if (openBtn) openBtn.addEventListener('click', function () {
@@ -2066,6 +2187,52 @@
   function initQuests() {
     if (!window.QUESTS) return;
     initTeacherQuestLibrary();
+    try {
+      var savedPack = localStorage.getItem(TASK_PACK_STORE_KEY);
+      if (savedPack) {
+        var parsedPack = parseTaskPack(savedPack, window.QUESTS);
+        questPackIds = parsedPack.questIds;
+        questPackTitle = parsedPack.title;
+      }
+    } catch (error) {
+      localStorage.removeItem(TASK_PACK_STORE_KEY);
+      console.warn('保存済み課題パックを読み込めませんでした:', error);
+    }
+    var studentPackInput = $('student-task-pack-input');
+    var studentPackStatus = $('student-task-pack-status');
+    var studentPackClear = $('student-task-pack-clear');
+    function renderPackStatus(message) {
+      if (studentPackStatus) studentPackStatus.textContent = message;
+      if (studentPackClear) studentPackClear.hidden = !questPackIds;
+    }
+    if (questPackIds) {
+      renderPackStatus('「' + questPackTitle + '」を適用中：' + questPackIds.length + '課題を表示しています。');
+    }
+    if (studentPackInput) studentPackInput.addEventListener('change', function () {
+      var file = studentPackInput.files && studentPackInput.files[0];
+      if (!file) return;
+      file.text().then(function (text) {
+        var pack = parseTaskPack(text, window.QUESTS);
+        localStorage.setItem(TASK_PACK_STORE_KEY, JSON.stringify(pack));
+        questPackIds = pack.questIds;
+        questPackTitle = pack.title;
+        questGradeFilter = 'all';
+        questUnitFilter = 'all';
+        renderQuestList();
+        renderPackStatus('「' + questPackTitle + '」を読み込みました。' + questPackIds.length + '課題を表示しています。');
+      }).catch(function (error) {
+        renderPackStatus('課題パックを読み込めませんでした: ' + error.message);
+      }).finally(function () { studentPackInput.value = ''; });
+    });
+    if (studentPackClear) studentPackClear.addEventListener('click', function () {
+      localStorage.removeItem(TASK_PACK_STORE_KEY);
+      questPackIds = null;
+      questPackTitle = '';
+      questGradeFilter = 'all';
+      questUnitFilter = 'all';
+      renderQuestList();
+      renderPackStatus('授業課題パックを解除しました。全課題を表示しています。');
+    });
     window.addEventListener('pagehide', saveQuestDraft);
     document.querySelectorAll('[data-quest-level]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -2292,6 +2459,7 @@
   }
 
   function initMisc() {
+    initConnectivity();
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
 

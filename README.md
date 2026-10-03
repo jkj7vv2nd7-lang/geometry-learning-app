@@ -22,6 +22,8 @@
 | 📓 探求の記録帳 | 予想→検証→発見・根拠・作図データをローカル保存。JSON/CSV出力・JSON追加復元、内容を選び氏名を任意で加える提出レポート、個人名・自由記述を含めない匿名ポートフォリオJSON出力に対応 |
 | ♿ キーボード・タッチ対応 | 矢印キー＋Enterでキャンバスに作図、タブをキーボード移動、タブレット／スマートフォン幅の作図操作に対応 |
 | 📡 校内ネットワーク配慮 | Tailwind・KaTeX・Three.jsをローカル配信。課題ライブラリ・作図・数式表示は外部CDNなしで利用可能 |
+| 📦 授業課題パック | 教師が授業セットをJSONで配布し、学習者が読み込んで対象課題だけに取り組めます。課題データはローカル保存 |
+| 📲 オフライン利用 | 一度ローカルサーバーから開いた後は、PWA Service Workerが画面・教材・作図資産をキャッシュ。ネットワーク断でも課題・作図・ローカル記録が利用可能 |
 | 📈 関数グラフ | 安全な数式パーサー（eval不使用）でy=f(x)を描画。零点・切片・最大最小を自動算出＋AI解説 |
 | 🧊 立体図形3D | 立方体〜球の8立体をドラッグ回転・自動回転で観察。体積・表面積を正確な公式で表示 |
 | 🔁 ドラッグ再計算API | フロントで頂点を動かした際の再計算用 `POST /api/recalculate` を用意 |
@@ -37,6 +39,7 @@ geometry-learning-app/
 ├── .gitignore               # Git/ZIP除外設定
 ├── package.json             # Playwrightブラウザ回帰テスト
 ├── tailwind.config.cjs      # Tailwind CSSのローカルビルド設定
+├── .github/workflows/quality.yml # push/PR時の品質ゲート
 ├── scripts/
 │   └── copy-vendor-assets.js # KaTeX・Three.jsをローカル配信フォルダへコピー
 ├── playwright.config.js     # ローカルFastAPI連携設定
@@ -46,11 +49,14 @@ geometry-learning-app/
 │   ├── geometry_solver.py   # 幾何学計算エンジン（LLM不使用・純粋数学のみ）
 │   └── ai_agent.py          # マルチモーダル解析＋AI自動切替＋教育コンテンツ生成
 ├── tests/
-│   ├── quest-validation.test.js # 課題データ・ローカル図形判定のNode.jsテスト
+│   ├── quest-validation.test.js # 課題データ・判定境界ケースのNode.jsテスト
 │   └── browser/
-│       └── quest-workflows.spec.js # Chromiumでの主要操作回帰テスト
+│       └── quest-workflows.spec.js # Chromium操作・オフライン・axe自動監査
 └── frontend/
     ├── index.html           # 2カラムUI（ヘッダー＋左操作パネル＋右表示エリア）
+    ├── manifest.webmanifest # インストール可能なPWAメタデータ
+    ├── service-worker.js    # オフライン用アプリシェルのキャッシュ
+    ├── icon.svg             # PWAアイコン
     ├── css/
     │   ├── style.css        # モード別テーマ・方眼紙グリッド・タッチ対応スタイル
     │   └── tailwind.generated.css # ビルド済みTailwind CSS（実行時CDN不要）
@@ -98,6 +104,14 @@ uvicorn main:app --reload --port 8000
 
 ブラウザで **http://localhost:8000** を開いてください。
 
+Windowsでは、Pythonと依存関係を準備後に `start-app.bat` をダブルクリックしても起動できます。終了は `stop-app.bat`、再起動は `restart-app.bat` です。
+
+### オフライン利用と課題パック
+
+オフライン利用には、`http://localhost:8000` または `http://127.0.0.1:8000` からオンライン状態で一度アクセスし、Service Workerが準備されるまで待ってください。以降、サーバーまたはネットワークに接続できない状態でも、同じブラウザ・同じURLのキャッシュ済み画面から課題と作図を利用できます。AI解説・AI判定・OCRなどサーバー機能はオフラインでは利用できません。ブラウザのサイトデータを削除すると、キャッシュと端末内の学習記録も消去されます。
+
+教師は「教師モード」の授業セットに課題を追加し、「学習者用課題パック」でJSONを保存して共有します。学習者は「探求コース」の「授業課題パックを読み込む」からJSONを選ぶと、対象課題がこのブラウザに保存され、課題一覧が絞り込まれます。「全課題に戻す」で解除できます。課題パックには課題IDのみが含まれ、学習者の記録・個人情報は含まれません。
+
 ### 4. APIエンドポイント一覧
 
 | メソッド | パス | 用途 |
@@ -123,6 +137,8 @@ npm run test:browser
 
 ブラウザテストはFastAPIアプリをローカルで起動し、課題絞り込み、スターター切替と下書き再開、教師の授業セット出力、記録帳インポート、匿名ポートフォリオ、提出レポートの選択内容、外部ネットワーク遮断下のローカル資産、キーボード操作とタブレット／スマートフォン表示を確認します。
 
+GitHub ActionsのQuality checksでも、資産ビルド、Pythonコンパイル、Node.js単体テスト、npm依存監査、Chromiumブラウザテスト（オフライン動作・課題パック・カリキュラム表・axeによるWCAG 2.1 A/AA自動監査を含む）を実行します。
+
 ### ローカルUI資産の更新
 
 通常の起動ではコミット済みのCSSとライブラリ資産を使い、Node.jsや外部CDNへの接続は必要ありません。依存ライブラリや画面クラスを変更したときは次の手順で配信物を再生成します。
@@ -141,6 +157,7 @@ KaTeXとThree.jsのライセンスは `frontend/vendor/` 内に同梱してい�
 - 課題ライブラリ、作図、数式表示はローカルで動作しますが、FastAPIサーバーへの接続は必要です。AI解説・AI検証・OCR・URL解析には、サーバーからAIプロバイダーへのネットワーク接続と設定が必要です。オフライン時はAIを使わない図形探究に利用範囲が限られます。
 - 学習記録・作図・課題の下書き・授業セットはブラウザのサイトデータに保存されます。共有端末では終了時にサイトデータを削除してください（必要な記録は先にエクスポート）。
 - 依存関係は `requirements.txt` を参照（fastapi / uvicorn / pydantic / numpy / python-multipart / google-generativeai / openai）
+- axe-coreの自動監査は児童・生徒／教師の主要画面に対し、WCAG 2.1 A/AAの機械検出可能な問題を確認します。実際の支援技術、Safari/Firefox、色覚・認知アクセシビリティのユーザーテストを代替するものではありません。
 
 ## ライセンス
 

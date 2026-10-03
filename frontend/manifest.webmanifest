@@ -1,0 +1,19 @@
+{
+  "name": "インタラクティブ図形学習支援ツール",
+  "short_name": "図形探究",
+  "description": "図形を作図し、予想・検証・発見につなげる学習ツール",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -736,4 +736,64 @@
       reflectionPrompts: ['予想と異なったところ、または確かめられたところは何ですか。', 'どの作図・測定が根拠になり、どこをさらに説明する必要がありますか。']
     };
   });
+  function curriculumGuide(q) {
+    if (q.level === 'elem') {
+      var elementaryPrior = /面積/.test(q.unit) ? '正方形・長方形の面積、単位面積、図形の分割' :
+        /対称/.test(q.unit) ? '線対称・点対称の見方、対応する点や辺' :
+        /垂直|平行|四角形/.test(q.unit) ? '直角、辺の長さ、三角形・四角形の特徴' :
+        /円|球/.test(q.unit) ? '円の中心・半径、平面図形と立体の見方' :
+        '辺・頂点・角の意味、三角形や四角形の基本的な性質';
+      return {
+        reference: '小学校学習指導要領（平成29年告示）算数「図形」領域（学年配当は目安）',
+        priorKnowledge: elementaryPrior,
+        learningFocus: q.goal + ' ' + q.focus,
+        assessmentEvidence: '図形を作図・操作して複数の例を比べ、気づいた性質を図や言葉で説明する。'
+      };
+    }
+    if (q.level === 'junior') {
+      var juniorGrade = q.grade.match(/中学校(\d)年/);
+      var juniorNumber = juniorGrade ? juniorGrade[1] : '1';
+      var juniorPrior = /三平方/.test(q.unit) ? '直角の性質、平方数、平方根、面積の考え' :
+        /相似/.test(q.unit) ? '比例・比、三角形の合同、平行線と角' :
+        /円/.test(q.unit) ? '円の中心・半径、角の性質、三角形の合同' :
+        /平行線/.test(q.unit) ? '対頂角、隣り合う角と一直線の角' :
+        /合同|四角形|三角形/.test(q.unit) ? '図形の基本用語、平行線と角、三角形の内角の和' :
+        /空間/.test(q.unit) ? '立体の頂点・辺・面、見取図と投影図' :
+        '点・直線・角、対称や図形の移動の見方';
+      var juniorReference = /三平方/.test(q.unit) ? '第3学年「B 図形」（三平方の定理）' :
+        /相似/.test(q.unit) ? '第3学年「B 図形」（相似な図形）' :
+        /円/.test(q.unit) ? '第3学年「B 図形」（円周角と中心角）' :
+        /平行線/.test(q.unit) ? '第2学年「B 図形」（平行線と角）' :
+        /合同|四角形|三角形|多角形/.test(q.unit) ? '第2学年「B 図形」（三角形・四角形の性質と証明）' :
+        '第' + juniorNumber + '学年「B 図形」（平面図形・空間図形・作図）';
+      return {
+        reference: '中学校学習指導要領（平成29年告示）数学 ' + juniorReference,
+        priorKnowledge: juniorPrior,
+        learningFocus: q.goal + ' ' + q.focus,
+        assessmentEvidence: /合同|証明|条件/.test(q.unit) ?
+          '対応関係を示し、性質や条件を根拠として筋道立てて説明する。' :
+          '作図を変形した複数の例・必要に応じた反例を比較し、予想と性質を根拠とともに説明する。'
+      };
+    }
+    var highReference = /座標|方程式/.test(q.unit) ? '高等学校学習指導要領（平成30年告示）数学II「図形と方程式」' :
+      /三角比|計量/.test(q.unit) ? '高等学校学習指導要領（平成30年告示）数学I「図形と計量」' :
+      /ベクトル/.test(q.unit) ? '高等学校学習指導要領（平成30年告示）数学C「ベクトル」' :
+      '高等学校学習指導要領（平成30年告示）数学A「図形の性質」';
+    var highPrior = /座標|方程式/.test(q.unit) ? '座標平面、直線の方程式、距離の公式' :
+      /三角比|計量/.test(q.unit) ? '直角三角形の辺の比、三角形の相似' :
+      /ベクトル/.test(q.unit) ? '平面上の点の位置、ベクトルの成分と演算' :
+      '三角形・円の基本性質、垂直二等分線と角の二等分線';
+    return {
+      reference: highReference,
+      priorKnowledge: highPrior,
+      learningFocus: q.goal + ' ' + q.focus,
+      assessmentEvidence: '作図と数式・図形の性質を関連付け、複数の場合を検討して論理的に説明する。'
+    };
+  }
+  global.QUESTS.forEach(function (q) {
+    q.curriculum = Object.assign(curriculumGuide(q), {
+      lessonMinutes: q.lessonPlan.durationMinutes,
+      allocationNote: '学習指導要領の内容区分を参照した授業配当の目安です。学年・時期は学校や教科書によって異なります。'
+    });
+  });
 })(window);

@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <title>インタラクティブ図形学習支援ツール</title>
   <!-- Tailwind CSS (ローカルビルド。実行時のCDN通信は不要) -->
   <link rel="stylesheet" href="css/tailwind.generated.css" />
@@ -53,6 +55,7 @@
       </div>
     </nav>
   </header>
+  <p id="connection-status" class="connection-status" role="status" aria-live="polite" hidden></p>
 
   <!-- ==================== 2カラム全体 ==================== -->
   <div id="app-layout" class="flex-1 w-full max-w-[1600px] mx-auto p-3 sm:p-4 grid gap-4 lg:grid-cols-[370px_minmax(0,1fr)] grid-cols-1 items-start">
@@ -314,6 +317,14 @@
               <button type="button" data-quest-level="junior" aria-pressed="false" class="construct-tool">中学校</button>
               <button type="button" data-quest-level="high" aria-pressed="false" class="construct-tool">高校</button>
             </div>
+            <div id="student-task-pack" class="mx-3 mb-2 rounded-xl border border-blue-200 bg-blue-50 p-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <label for="student-task-pack-input" class="text-sm font-bold">授業課題パックを読み込む</label>
+                <input id="student-task-pack-input" type="file" accept="application/json,.json" class="max-w-full text-sm" />
+                <button id="student-task-pack-clear" type="button" class="tool-btn" hidden>全課題に戻す</button>
+              </div>
+              <p id="student-task-pack-status" class="mt-1 text-xs text-slate-600" role="status" aria-live="polite">教師が保存した課題パックJSONを読み込むと、対象課題だけを表示します。データはこの端末内に保存されます。</p>
+            </div>
             <div class="grid gap-2 px-3 pb-2 sm:grid-cols-2">
               <label class="text-xs font-bold">学年
                 <select id="quest-grade-filter" aria-label="課題を学年で絞り込む" class="mt-1 w-full border rounded-xl px-3 py-2 text-sm min-h-[44px]">
@@ -419,6 +430,9 @@
               <button id="teacher-lesson-save-btn" type="button" class="tool-btn">💾 授業セットを保存</button>
               <button id="teacher-lesson-print-btn" type="button" class="tool-btn">🖨️ セットを印刷</button>
               <button id="teacher-lesson-download-btn" type="button" class="tool-btn">⬇️ セットを保存</button>
+              <button id="teacher-lesson-pack-btn" type="button" class="tool-btn">📦 学習者用課題パック</button>
+              <button id="teacher-lesson-pack-import-btn" type="button" class="tool-btn">⬆️ 課題パックを読込</button>
+              <input id="teacher-lesson-pack-input" type="file" accept="application/json,.json" class="hidden" />
               <button id="teacher-lesson-clear-btn" type="button" class="tool-btn">空にする</button>
             </div>
           </div>
@@ -426,6 +440,17 @@
           <div id="teacher-lesson-items" class="mt-2 flex flex-wrap gap-2" aria-live="polite"></div>
         </section>
         <section id="teacher-quest-preview" class="bg-white rounded-2xl shadow p-5" aria-live="polite" aria-label="授業用探究課題プレビュー"></section>
+        <details id="teacher-curriculum-coverage" class="bg-white rounded-2xl shadow p-4">
+          <summary class="cursor-pointer font-extrabold">🧭 学年・単元のカリキュラム対応表（30課題）</summary>
+          <p class="text-xs text-slate-600 my-2">学習指導要領の内容区分を参照した授業計画の目安です。配当学年・時期は学校や教科書によって異なるため、実際の年間計画に合わせて調整してください。</p>
+          <div id="teacher-curriculum-summary" class="text-sm font-bold mb-2"></div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left border-collapse">
+              <thead><tr><th class="p-2 border">学年・単元／課題</th><th class="p-2 border">参照する内容区分</th><th class="p-2 border">既習事項の目安</th><th class="p-2 border">学習の焦点・評価の証拠</th><th class="p-2 border">時間</th></tr></thead>
+              <tbody id="teacher-curriculum-rows"></tbody>
+            </table>
+          </div>
+        </details>
         <!-- タブバー -->
         <div id="teacher-tabs" role="tablist" aria-label="教師用出力タブ" class="bg-white rounded-2xl shadow p-2 flex flex-col sm:flex-row gap-2">
           <button id="tab-lesson-plan" role="tab" aria-selected="true" aria-controls="panel-lesson-plan" data-teacher-tab="lesson-plan" class="teacher-tab teacher-tab-active">📝 指導案出力</button>

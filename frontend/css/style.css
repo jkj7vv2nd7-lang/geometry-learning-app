@@ -4,6 +4,19 @@
  * 方針: Tailwindクラスと競合しない独自クラス名のみ定義する
  * ============================================================ */
 
+.connection-status {
+  position: sticky;
+  top: 4.5rem;
+  z-index: 25;
+  margin: 0;
+  padding: 8px 16px;
+  background: #fff7ed;
+  border-bottom: 1px solid #fdba74;
+  color: #7c2d12;
+  font-weight: 700;
+}
+.text-slate-400 { color: #64748b !important; }
+
 /* ============================================================
  * 9. 作図ツールバー（学習者用・探求キャンバス）
  * ============================================================ */
@@ -30,7 +43,7 @@
 .construct-tool-active {
   background: #f59e00 !important;
   border-color: #b45309 !important;
-  color: #fff !important;
+  color: #422006 !important;
   box-shadow: 0 4px 12px rgba(245, 158, 0, 0.45);
 }
 .teacher-lesson-chip {
@@ -129,7 +142,7 @@ dialog#journal-report-dialog input[type="checkbox"] {
 }
 .construct-history-current {
   background: #f59e00 !important;
-  color: #fff !important;
+  color: #422006 !important;
   border-color: #b45309 !important;
   font-weight: 800;
 }
@@ -631,9 +644,9 @@ body.student-mode .mode-tab-active {
 }
 body[data-mode="teacher"] .mode-tab-active,
 body.teacher-mode .mode-tab-active {
-  background: #059669;
+  background: #047857;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
+  box-shadow: 0 4px 12px rgba(4, 120, 87, 0.4);
 }
 
 /* ============================================================
@@ -828,13 +841,13 @@ body[data-mode="teacher"] #chat-send-btn,
 body.teacher-mode #chat-send-btn,
 body[data-mode="teacher"] #add-url-btn,
 body.teacher-mode #add-url-btn {
-  background: #059669;
+  background: #047857;
 }
 body[data-mode="teacher"] #chat-send-btn:hover,
 body.teacher-mode #chat-send-btn:hover,
 body[data-mode="teacher"] #add-url-btn:hover,
 body.teacher-mode #add-url-btn:hover {
-  background: #047857;
+  background: #065f46;
 }
 
 /* 教師用タブ */
@@ -856,9 +869,9 @@ body.teacher-mode #add-url-btn:hover {
   transform: translateY(-1px);
 }
 .teacher-tab-active {
-  background: #059669 !important;
+  background: #047857 !important;
   color: #fff !important;
-  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.4);
+  box-shadow: 0 6px 16px rgba(4, 120, 87, 0.35);
 }
 #teacher-quest-select {
   width: min(100%, 26rem);
@@ -873,7 +886,6 @@ body.teacher-mode #add-url-btn:hover {
   transition: var(--transition-smooth);
 }
 #teacher-source-area.teacher-locked {
-  opacity: 0.55;
   background: #f8fafc repeating-linear-gradient(
     -45deg,
     transparent,
@@ -893,11 +905,11 @@ body.teacher-mode #add-url-btn:hover {
 body[data-mode="student"] #teacher-only-badge,
 body.student-mode #teacher-only-badge {
   background: #e2e8f0;
-  color: #64748b;
+  color: #334155;
 }
 body[data-mode="teacher"] #teacher-only-badge,
 body.teacher-mode #teacher-only-badge {
-  background: #059669;
+  background: #047857;
   color: #fff;
 }
 

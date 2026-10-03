@@ -10,6 +10,7 @@
     "test:browser": "playwright test"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/cli": "4.3.0",
     "katex": "^0.16.11",

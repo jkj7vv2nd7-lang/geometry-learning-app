@@ -42,6 +42,10 @@ test('catalog entries are complete, unique, and categorized for all school stage
     assert.ok(quest.lessonPlan.teacherPrompts.length > 0, `${quest.id} missing teacher prompts`);
     assert.ok(quest.lessonPlan.commonMisconceptions.length > 0, `${quest.id} missing anticipated misconceptions`);
     assert.ok(quest.lessonPlan.reflectionPrompts.length > 0, `${quest.id} missing reflection prompts`);
+    for (const key of ['reference', 'priorKnowledge', 'learningFocus', 'assessmentEvidence', 'lessonMinutes', 'allocationNote']) {
+      assert.ok(quest.curriculum[key], `${quest.id} missing curriculum ${key}`);
+    }
+    assert.equal(quest.curriculum.lessonMinutes, quest.lessonPlan.durationMinutes);
     assert.ok(quest.grade.startsWith(quest.level === 'elem' ? '小学校' : quest.level === 'junior' ? '中学校' : '高校'));
     assert.ok(quest.checks.every((check) => check.kind.startsWith('min_') ||
       check.kind.startsWith('geometry_') || ['has_check', 'has_theorem'].includes(check.kind)), `${quest.id} has an unknown check`);
@@ -92,6 +96,49 @@ test('local Pythagorean validation rejects non-right triangles', () => {
   assert.equal(check('geometry_pythagorean', triangle({
     A: { x: 0, y: 0 }, B: { x: 1, y: 3 }, C: { x: 4, y: 0 }
   }))[0].ok, false);
+});
+
+test('geometry checks reject degenerate figures and respect documented numeric tolerances', () => {
+  const collinear = triangle({
+    A: { x: 0, y: 0 }, B: { x: 5, y: 0 }, C: { x: 10, y: 0 }
+  });
+  assert.equal(check('geometry_triangle_angle_sum', collinear)[0].ok, false);
+  assert.equal(check('geometry_pythagorean', collinear)[0].ok, false);
+  assert.equal(check('geometry_isosceles_base_angles', collinear)[0].ok, false);
+  assert.equal(check('geometry_thales_right_angle', {
+    ...collinear,
+    circles: [['A', 'B']]
+  })[0].ok, false);
+
+  const slightlyOblique = triangle({
+    A: { x: 0, y: 0 },
+    B: { x: 0, y: 100 },
+    C: { x: 100, y: -Math.tan(0.9 * Math.PI / 180) * 100 }
+  });
+  assert.equal(check('geometry_pythagorean', slightlyOblique)[0].ok, true,
+    'right-angle deviation below the 1 degree tolerance is accepted');
+  slightlyOblique.points.C.y = -Math.tan(1.1 * Math.PI / 180) * 100;
+  assert.equal(check('geometry_pythagorean', slightlyOblique)[0].ok, false,
+    'right-angle deviation above the 1 degree tolerance is rejected');
+});
+
+test('parallel-line and ratio checks reject collapsed, boundary-only, and collinear arrangements', () => {
+  const collapsed = {
+    points: { A: { x: 0, y: 0 }, B: { x: 0, y: 0 }, P: { x: 0, y: 0 }, X: { x: 5, y: 0 } },
+    parallels: [{ a: 'A', b: 'B', p: 'P' }],
+    segments: [['A', 'X']]
+  };
+  assert.equal(check('geometry_parallel_lines', collapsed)[0].ok, false);
+
+  const boundaryPoints = {
+    points: {
+      A: { x: 0, y: 0 }, B: { x: 10, y: 0 }, C: { x: 0, y: 10 },
+      D: { x: 0, y: 0 }, E: { x: 0, y: 5 }
+    },
+    segments: [['A', 'B'], ['B', 'C'], ['C', 'A'], ['D', 'E']]
+  };
+  assert.equal(check('geometry_parallel_side_ratio', boundaryPoints)[0].ok, false,
+    'a cut endpoint at the triangle vertex is not an interior proportional division');
 });
 
 test('local isosceles validation checks equal sides and corresponding base angles', () => {
@@ -188,7 +235,8 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
     'quest-resume-btn', 'teacher-lesson-add-btn', 'teacher-lesson-print-btn', 'teacher-worksheet-audience',
     'journal-export-portfolio-btn', 'journal-export-report-btn', 'journal-report-dialog',
     'journal-report-entry', 'journal-report-include-name', 'journal-report-name',
-    'journal-report-include-construction']) {
+    'journal-report-include-construction', 'teacher-curriculum-coverage', 'teacher-curriculum-rows',
+    'teacher-lesson-pack-btn', 'student-task-pack-input', 'connection-status']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /data-quest-level="all" aria-pressed="true"/);
@@ -197,6 +245,8 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
   assert.match(html, /for="teacher-quest-select"/);
   assert.match(html, /id="journal-export-status"[^>]*role="status"/);
   assert.match(html, /id="journal-report-name"[^>]*disabled/);
+  assert.match(html, /manifest\.webmanifest/);
+  assert.ok(fs.readFileSync(path.join(root, 'frontend/js/app.js'), 'utf8').includes("register('/service-worker.js')"));
   assert.doesNotMatch(html, /cdn\.tailwindcss\.com|cdn\.jsdelivr\.net|unpkg\.com/);
   assert.match(html, /vendor\/katex\/katex\.min\.css/);
   assert.match(html, /vendor\/three\.module\.min\.js/);

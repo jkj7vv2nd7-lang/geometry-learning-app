@@ -280,3 +280,19 @@ if FRONTEND_DIR.is_dir():
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(FRONTEND_DIR / "index.html")
+
+    @app.get("/service-worker.js", include_in_schema=False)
+    def service_worker() -> FileResponse:
+        return FileResponse(
+            FRONTEND_DIR / "service-worker.js",
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/"},
+        )
+
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    def web_manifest() -> FileResponse:
+        return FileResponse(FRONTEND_DIR / "manifest.webmanifest", media_type="application/manifest+json")
+
+    @app.get("/icon.svg", include_in_schema=False)
+    def app_icon() -> FileResponse:
+        return FileResponse(FRONTEND_DIR / "icon.svg", media_type="image/svg+xml")

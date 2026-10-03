@@ -2,6 +2,7 @@
 
 const { test, expect } = require('@playwright/test');
 const fs = require('node:fs/promises');
+const AxeBuilder = require('@axe-core/playwright').default;
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/*', (route) => {
@@ -112,6 +113,117 @@ test('filters quests by stage, grade, and unit', async ({ page }) => {
   await page.locator('#quest-unit-filter').selectOption('円');
   await expect(page.locator('#quest-list .quest-card')).toHaveCount(1);
   await expect(page.locator('#quest-list')).toContainText('半円の角のふしぎ');
+});
+
+test('teacher task packs can be imported by learners and cleared locally', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#mode-teacher-btn').click();
+  await page.locator('#teacher-lesson-add-btn').click();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('#teacher-lesson-pack-btn').click()
+  ]);
+  const pack = JSON.parse(await fs.readFile(await download.path(), 'utf8'));
+  expect(pack.type).toBe('geometry-quest-pack');
+  expect(pack.schemaVersion).toBe(1);
+  expect(pack.questIds).toHaveLength(1);
+
+  await page.locator('#mode-student-btn').click();
+  await page.locator('#student-task-pack-input').setInputFiles({
+    name: 'lesson-pack.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(pack))
+  });
+  await expect(page.locator('#quest-list .quest-card')).toHaveCount(1);
+  await expect(page.locator('#student-task-pack-status')).toContainText('1課題を表示');
+  await page.locator('#student-task-pack-input').setInputFiles({
+    name: 'invalid-pack.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({
+      type: 'geometry-quest-pack',
+      schemaVersion: 1,
+      title: '不正な課題パック',
+      questIds: ['missing-quest']
+    }))
+  });
+  await expect(page.locator('#student-task-pack-status')).toContainText('一致しないID');
+  await expect(page.locator('#quest-list .quest-card')).toHaveCount(1);
+  await page.locator('#student-task-pack-clear').click();
+  await expect(page.locator('#quest-list .quest-card')).toHaveCount(30);
+
+  await page.locator('#mode-teacher-btn').click();
+  await page.locator('#teacher-lesson-pack-import-btn').click();
+  await page.locator('#teacher-lesson-pack-input').setInputFiles({
+    name: 'lesson-pack.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(pack))
+  });
+  await expect(page.locator('#teacher-lesson-items .teacher-lesson-chip')).toHaveCount(1);
+});
+
+test('teacher curriculum map covers every task and shows stage totals', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#mode-teacher-btn').click();
+  const coverage = page.locator('#teacher-curriculum-coverage');
+  await coverage.locator('summary').click();
+  await expect(page.locator('#teacher-curriculum-rows tr')).toHaveCount(30);
+  await expect(page.locator('#teacher-curriculum-summary')).toContainText('中学校 16課題');
+  await expect(page.locator('#teacher-quest-preview')).toContainText('既習事項の目安');
+  await expect(page.locator('#teacher-quest-preview')).toContainText('授業配当の目安');
+});
+
+test('service worker caches the app shell for offline inquiry and construction', async ({ page, context }) => {
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    await new Promise((resolve) => {
+      if (navigator.serviceWorker.controller) return resolve();
+      navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+    });
+  });
+  const pwaResources = await page.evaluate(async () => ({
+    manifest: (await fetch('/manifest.webmanifest')).status,
+    worker: (await fetch('/service-worker.js')).status,
+    cacheKeys: await caches.keys()
+  }));
+  expect(pwaResources.manifest).toBe(200);
+  expect(pwaResources.worker).toBe(200);
+  expect(pwaResources.cacheKeys).toContain('geometry-learning-shell-v1');
+
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.locator('#quest-list .quest-card')).toHaveCount(30);
+  await expect(page.locator('#connection-status')).toContainText('オフラインです');
+  await page.locator('#geometry-canvas').focus();
+  await page.keyboard.press('p');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.ConstructionBoard.stats().points)).toBe(1);
+  await context.setOffline(false);
+});
+
+test('student and teacher workflows have no WCAG 2.1 A/AA violations', async ({ page }) => {
+  await page.goto('/');
+  const studentAudit = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(studentAudit.violations.map((issue) => ({
+    id: issue.id,
+    description: issue.description,
+    nodes: issue.nodes.map((node) => ({ target: node.target, summary: node.failureSummary }))
+  }))).toEqual([]);
+
+  await page.locator('#mode-teacher-btn').click();
+  await expect.poll(() => page.locator('#teacher-source-area').evaluate((element) => getComputedStyle(element).opacity)).toBe('1');
+  await page.waitForTimeout(350);
+  const teacherAudit = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(teacherAudit.violations.map((issue) => ({
+    id: issue.id,
+    description: issue.description,
+    nodes: issue.nodes.map((node) => ({ target: node.target, summary: node.failureSummary }))
+  }))).toEqual([]);
 });
 
 test('keyboard users can navigate modes, move between teacher tabs, and place points', async ({ page }) => {
