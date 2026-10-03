@@ -470,6 +470,35 @@
       CB.clear();
       try { localStorage.removeItem(CONSTRUCT_STORE_KEY); } catch (_) {}
     });
+    // 作図のJSON保存・読込
+    var csave = $('construct-save-btn'), cload = $('construct-load-btn'), cloadIn = $('construct-load-input');
+    if (csave) csave.addEventListener('click', function () {
+      var blob = new Blob([JSON.stringify(CB.getFullState(), null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'construction-' + Date.now() + '.json';
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+      addChatMessage('💾 作図をファイルに保存しました。', 'ai');
+    });
+    if (cload && cloadIn) {
+      cload.addEventListener('click', function () { cloadIn.click(); });
+      cloadIn.addEventListener('change', function () {
+        var f = cloadIn.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            var s = JSON.parse(reader.result);
+            if (s.data) CB.restoreFullState(s);
+            else CB.load(s);
+            addChatMessage('📂 作図ファイルを読み込みました。', 'ai');
+          } catch (e) { showError('作図ファイルの読み込みに失敗しました: ' + e.message); }
+        };
+        reader.readAsText(f);
+        cloadIn.value = '';
+      });
+    }
     // 変更のたびに計測表示＋自動保存（保存は間引きして軽量化）
     var saveTimer = null;
     CB.setOnChange(function () {
@@ -624,6 +653,99 @@
     });
   }
 
+  // ---------- 関数グラフ ----------
+  function initFunctionGraph() {
+    var FG = window.FunctionGraph;
+    if (!FG) return;
+    var input = $('function-input');
+
+    function renderList() {
+      var box = $('function-list');
+      if (!box) return;
+      box.innerHTML = '';
+      FG.list().forEach(function (F) {
+        var chip = document.createElement('span');
+        chip.className = 'prompt-example-chip';
+        chip.style.borderColor = F.color;
+        chip.style.color = F.color;
+        chip.textContent = 'y = ' + F.expr + '（零点' + (F.zeros.length ? F.zeros.join(', ') : 'なし') + '） ✕';
+        chip.title = 'クリックで削除';
+        chip.setAttribute('role', 'button');
+        chip.setAttribute('tabindex', '0');
+        (function (id) {
+          function rm() { FG.removeFunction(id); }
+          chip.addEventListener('click', rm);
+          chip.addEventListener('keydown', function (e) { if (e.key === 'Enter') rm(); });
+        })(F.id);
+        box.appendChild(chip);
+      });
+    }
+    FG.setOnChange(renderList);
+
+    function addFromInput() {
+      if (!input) return;
+      var expr = input.value.trim().replace(/^[yY]\s*=/, '');
+      if (!expr) { addChatMessage('📈 式を入力してね（例：x^2 - 2*x）。sin・cos・sqrtも使えます。', 'ai'); input.focus(); return; }
+      try {
+        var F = FG.addFunction(expr);
+        input.value = '';
+        setStatus('グラフ追加: y = ' + F.expr, true);
+      } catch (err) {
+        addChatMessage('⚠️ その式は読めませんでした：' + err.message, 'ai');
+        input.focus();
+      }
+    }
+    var addBtn = $('add-function-btn');
+    if (addBtn) addBtn.addEventListener('click', addFromInput);
+    if (input) input.addEventListener('keydown', function (e) { if (e.key === 'Enter') addFromInput(); });
+
+    var tg = $('toggle-graph-btn');
+    if (tg) tg.addEventListener('click', function () {
+      FG.setVisible(!FG.isVisible());
+      tg.textContent = FG.isVisible() ? '📊 座標ON' : '📊 座標OFF';
+      tg.setAttribute('aria-pressed', String(FG.isVisible()));
+    });
+
+    var ex = $('explain-graph-btn');
+    if (ex) ex.addEventListener('click', handleExplainGraph);
+    renderList();
+    FG.renderAll();
+  }
+
+  async function handleExplainGraph() {
+    var FG = window.FunctionGraph;
+    if (!FG) return;
+    var list = FG.list();
+    if (!list.length) {
+      addChatMessage('📈 まず式を入力してグラフを描こう（例：x^2 - 2*x）。', 'ai');
+      return;
+    }
+    var summary = list.map(function (F) {
+      return 'y = ' + F.expr + '：零点x=' + (F.zeros.length ? F.zeros.join(', ') : 'なし') +
+        '、y切片=' + (F.yIntercept === null ? 'なし' : F.yIntercept) +
+        '、表示範囲の最小値=' + F.ymin + '・最大値=' + F.ymax;
+    }).join('\n');
+    showLoading('AI先生がグラフを分析中...');
+    try {
+      var res = await fetch(ENDPOINT_CHAT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: '次の関数のグラフの特徴（零点・切片・増減・形）を優しく解説し、次に調べるとよい問いを1つ出してください。\n' + summary,
+          grade: $('grade-select') ? $('grade-select').value : 'elementary-high',
+          mode: currentMode
+        })
+      });
+      if (!res.ok) throw new Error('status ' + res.status);
+      var data = await res.json();
+      addChatMessage(data.reply, 'ai');
+    } catch (err) {
+      showError('グラフ解説に失敗しました: ' + err.message);
+    } finally {
+      hideLoading();
+    }
+  }
+
   function initMisc() {
     var gen = $('generate-btn');
     if (gen) gen.addEventListener('click', handleGenerate);
@@ -695,6 +817,7 @@
     initUploadZone();
     initJsonButtons();
     initConstructionBoard();
+    initFunctionGraph();
     initMisc();
     setStatus('待機中', null);
   });

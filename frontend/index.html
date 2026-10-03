@@ -166,12 +166,17 @@
               <button id="tool-angle" type="button" data-construct-tool="angle" class="construct-tool" title="頂点→点→点の順に3点で角度">📐 角度</button>
               <button id="tool-bisector" type="button" data-construct-tool="bisector" class="construct-tool" title="頂点→点→点の順に3点で二等分線">∠ 二等分線</button>
               <button id="tool-parallel" type="button" data-construct-tool="parallel" class="construct-tool" title="線分を選んで点を選ぶと平行線">⇉ 平行線</button>
+              <button id="tool-pbis" type="button" data-construct-tool="pbis" class="construct-tool" title="線分を選ぶと垂直二等分線">⊥ 中点垂線</button>
+              <button id="tool-tangent" type="button" data-construct-tool="tangent" class="construct-tool" title="円を選んで点を選ぶと接線">➔ 接線</button>
               <button id="tool-delete" type="button" data-construct-tool="delete" class="construct-tool" title="図形をタップで削除">🗑 削除</button>
               <button id="toggle-snap-btn" type="button" class="tool-btn" aria-pressed="true" title="方眼に吸着">🧲 吸着ON</button>
               <button id="toggle-trace-btn" type="button" class="tool-btn" aria-pressed="false" title="ドラッグした点の軌跡を記録">✨ 軌跡OFF</button>
               <button id="construct-undo-btn" type="button" class="tool-btn" title="1手もどる">↩ もどる</button>
               <button id="construct-redo-btn" type="button" class="tool-btn" title="1手すすむ">↪ やりなおし</button>
               <button id="clear-construct-btn" type="button" class="tool-btn" title="作図を全消去">🧹 全消去</button>
+              <button id="construct-save-btn" type="button" class="tool-btn" title="作図をJSONファイルに保存">💾 作図保存</button>
+              <button id="construct-load-btn" type="button" class="tool-btn" title="保存した作図JSONを読み込む">📂 作図読込</button>
+              <input id="construct-load-input" type="file" accept="application/json,.json" class="hidden" />
               <button id="verify-construction-btn" type="button" class="tool-btn verify-btn" title="作図をAIに検証してもらう">🔍 AI検証</button>
               <button id="discover-btn" type="button" class="tool-btn verify-btn" title="作図から定理を自動発見する">📜 定理レポート</button>
             </div>
@@ -185,6 +190,8 @@
               <rect x="0" y="0" width="800" height="500" fill="url(#grid-pattern)" />
               <g id="geometry-layer"><!-- JS(app.js)が座標JSONから図形を描画 --></g>
               <g id="measure-layer"><!-- 辺の長さ・角度ラベルを描画 --></g>
+              <g id="graph-grid-layer"><!-- 関数グラフ用・座標軸 --></g>
+              <g id="graph-layer"><!-- 関数グラフの曲線・零点 --></g>
               <g id="construct-layer"><!-- 作図モードの図形（window.ConstructionBoardが管理） --></g>
               <g id="construct-measure-layer"><!-- 作図の計測ラベル --></g>
               <text id="canvas-placeholder" x="400" y="250" text-anchor="middle" fill="#94a3b8" font-size="20">
@@ -197,6 +204,18 @@
             </div>
           </div>
           <p class="text-xs text-slate-500 px-4 py-2">💡 ヒント：ツールバーの「● 点」「📏 線分」「⭕ 円」で<strong>自分で作図</strong>できるよ！点をドラッグして動かし、定理が成り立つか確かめたら「🔍 AI検証」を押してみよう。AI生成図の頂点（●）ドラッグも可能です。</p>
+          <!-- 関数グラフ入力バー -->
+          <div id="function-bar" class="px-3 py-2 border-t bg-slate-50 flex flex-col gap-2">
+            <div class="flex flex-wrap gap-2 items-center">
+              <span class="text-sm font-extrabold">📈 関数グラフ</span>
+              <span class="text-xs text-slate-500">y =</span>
+              <input id="function-input" type="text" placeholder="例： x^2 - 2*x（sin・cos・sqrtも使えます）" class="flex-1 min-w-[180px] border rounded-xl px-3 py-2 text-sm min-h-[44px] focus:ring-2 focus:outline-none" />
+              <button id="add-function-btn" type="button" class="tool-btn" title="グラフを追加">➕ 追加</button>
+              <button id="toggle-graph-btn" type="button" class="tool-btn" aria-pressed="true" title="座標・グラフの表示切替">📊 座標ON</button>
+              <button id="explain-graph-btn" type="button" class="tool-btn verify-btn" title="グラフの特徴をAIに解説してもらう">🤖 グラフAI解説</button>
+            </div>
+            <div id="function-list" class="flex flex-wrap gap-2" aria-live="polite"></div>
+          </div>
         </section>
 
         <!-- 作図の履歴 -->
@@ -206,6 +225,30 @@
             <span id="history-count" class="text-xs text-slate-500"></span>
           </div>
           <ol id="construct-history" class="p-2 space-y-1 max-h-[140px] overflow-y-auto text-sm" aria-live="polite"></ol>
+        </section>
+
+        <!-- 立体図形（3D） -->
+        <section id="solid-section" aria-labelledby="solid-heading" class="bg-white rounded-2xl shadow overflow-hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
+            <h2 id="solid-heading" class="font-extrabold">🧊 立体図形（3D・ドラッグで回転）</h2>
+            <button id="solid-rotate-btn" type="button" class="tool-btn" aria-pressed="true" title="自動回転の切替">🔄 回転ON</button>
+          </div>
+          <div id="solid-toolbar" class="flex flex-wrap gap-1.5 px-3 py-2" role="toolbar" aria-label="立体選択">
+            <button type="button" data-solid="cube" class="construct-tool construct-tool-active">立方体</button>
+            <button type="button" data-solid="cuboid" class="construct-tool">直方体</button>
+            <button type="button" data-solid="tetra" class="construct-tool">正四面体</button>
+            <button type="button" data-solid="pyramid" class="construct-tool">正四角錐</button>
+            <button type="button" data-solid="octa" class="construct-tool">正八面体</button>
+            <button type="button" data-solid="cylinder" class="construct-tool">円柱</button>
+            <button type="button" data-solid="cone" class="construct-tool">円錐</button>
+            <button type="button" data-solid="sphere" class="construct-tool">球</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 px-4 pb-1 text-sm">
+            <label for="solid-size" class="font-bold">大きさ: <span id="solid-size-val">2</span></label>
+            <input id="solid-size" type="range" min="1" max="3" step="0.1" value="2" class="flex-1 min-w-[160px]" />
+          </div>
+          <div id="solid-view" class="w-full cursor-grab" style="height:340px" role="img" aria-label="立体図形ビュー"></div>
+          <div id="solid-measure" class="px-4 py-2 text-sm leading-relaxed border-t" aria-live="polite"></div>
         </section>
 
         <!-- チャット・解説エリア -->
@@ -319,5 +362,10 @@
   <!-- アプリロジック（描画エンジン → 制御の順で読込） -->
   <script src="js/renderer.js" defer></script>
   <script src="js/app.js" defer></script>
+  <!-- 3D立体ビュー（three.jsモジュール） -->
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="js/solid.js"></script>
 </body>
 </html>
