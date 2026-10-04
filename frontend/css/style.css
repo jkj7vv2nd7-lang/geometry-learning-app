@@ -1236,6 +1236,15 @@ body[data-mode="student"] #teacher-source-area {
   display: none;
 }
 
+body[data-mode="student"] #app-layout {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+body[data-mode="student"] #control-panel,
+body[data-mode="student"] #toggle-panel-btn {
+  display: none !important;
+}
+
 #main-display-area,
 #student-view,
 #student-tools,
