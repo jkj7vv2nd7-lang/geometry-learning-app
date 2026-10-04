@@ -62,7 +62,7 @@
   </header>
 
   <!-- ==================== 2カラム全体 ==================== -->
-  <div id="app-layout" class="flex-1 w-full max-w-[1600px] mx-auto p-3 sm:p-4 grid gap-4 lg:grid-cols-[370px_minmax(0,1fr)] grid-cols-1 items-start">
+  <div id="app-layout" class="flex-1 w-full max-w-[1720px] mx-auto p-3 sm:p-4 grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)] grid-cols-1 items-start">
 
     <!-- ==================== 左：コントロール＆入力パネル ==================== -->
     <aside id="control-panel" aria-label="コントロールパネル" class="bg-white rounded-2xl shadow p-4 sm:p-5 flex flex-col gap-5 lg:sticky lg:top-[84px]">
@@ -229,6 +229,16 @@
           </div>
         </section>
 
+        <section id="student-tools" aria-label="学習ツール" class="student-tools">
+          <div id="student-tools-tabs" role="tablist" aria-label="学習ツールの切り替え" class="student-tools-tabs">
+            <button id="student-tab-chat" type="button" role="tab" aria-selected="true" aria-controls="student-panel-chat" tabindex="0" data-student-tool="chat">💬 解説</button>
+            <button id="student-tab-history" type="button" role="tab" aria-selected="false" aria-controls="student-panel-history" tabindex="-1" data-student-tool="history">🕰 履歴</button>
+            <button id="student-tab-journal" type="button" role="tab" aria-selected="false" aria-controls="student-panel-journal" tabindex="-1" data-student-tool="journal">📓 記録帳</button>
+            <button id="student-tab-quests" type="button" role="tab" aria-selected="false" aria-controls="student-panel-quests" tabindex="-1" data-student-tool="quests">🗺 課題</button>
+            <button id="student-tab-solid" type="button" role="tab" aria-selected="false" aria-controls="student-panel-solid" tabindex="-1" data-student-tool="solid">🧊 立体</button>
+          </div>
+
+          <div id="student-panel-chat" role="tabpanel" aria-labelledby="student-tab-chat" data-student-tool-panel="chat">
         <!-- チャット・解説エリア（キャンバス直下：作図しながら対話） -->
         <section id="chat-section" aria-labelledby="chat-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b panel-drag-handle">
@@ -247,8 +257,10 @@
           </div>
           </div>
         </section>
+          </div>
 
         <!-- 作図の履歴 -->
+          <div id="student-panel-history" role="tabpanel" aria-labelledby="student-tab-history" data-student-tool-panel="history" class="hidden">
         <section id="history-section" aria-labelledby="history-heading" class="bg-white rounded-2xl shadow overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b panel-drag-handle">
             <h2 id="history-heading" class="font-extrabold text-sm">🕰 作図の履歴（タップで巻き戻し）</h2>
@@ -256,8 +268,10 @@
           </div>
           <ol id="construct-history" class="p-2 space-y-1 max-h-[140px] overflow-y-auto text-sm" aria-live="polite"></ol>
         </section>
+          </div>
 
         <!-- 探求の記録帳（予想→検証） -->
+          <div id="student-panel-journal" role="tabpanel" aria-labelledby="student-tab-journal" data-student-tool-panel="journal" class="hidden">
         <section id="journal-section" aria-labelledby="journal-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b panel-drag-handle">
             <h2 id="journal-heading" class="font-extrabold">📓 探求の記録帳（予想 → 検証）</h2>
@@ -275,8 +289,10 @@
           </div>
           </div>
         </section>
+          </div>
 
         <!-- 探求コース（導入課題） -->
+          <div id="student-panel-quests" role="tabpanel" aria-labelledby="student-tab-quests" data-student-tool-panel="quests" class="hidden">
         <section id="quest-section" aria-labelledby="quest-heading" class="bg-white rounded-2xl shadow flex flex-col overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b panel-drag-handle">
             <h2 id="quest-heading" class="font-extrabold">🗺 探求コース（課題に挑戦）</h2>
@@ -307,8 +323,10 @@
             </div>
           </div>
         </section>
+          </div>
 
         <!-- 立体図形（3D・ふだんは折りたたみ） -->
+          <div id="student-panel-solid" role="tabpanel" aria-labelledby="student-tab-solid" data-student-tool-panel="solid" class="hidden">
         <section id="solid-section" aria-labelledby="solid-heading" class="bg-white rounded-2xl shadow overflow-hidden">
           <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b">
             <h2 id="solid-heading" class="font-extrabold">🧊 立体図形（3D・ドラッグで回転）</h2>
@@ -334,6 +352,8 @@
             </div>
             <div id="solid-view" class="w-full cursor-grab" style="height:340px" role="img" aria-label="立体図形ビュー"></div>
             <div id="solid-measure" class="px-4 py-2 text-sm leading-relaxed border-t" aria-live="polite"></div>
+          </div>
+        </section>
           </div>
         </section>
       </div>
