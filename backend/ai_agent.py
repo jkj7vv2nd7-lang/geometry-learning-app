@@ -507,7 +507,9 @@ def _analyze_with_openai(sources: List[PreparedSource], hint: str) -> Optional[D
         return None
 
 
-def _generate_text_with_openai(system: str, user: str) -> Optional[str]:
+def _generate_text_with_openai(
+    system: str, user: str, max_output_tokens: Optional[int] = None
+) -> Optional[str]:
     """OpenAI (gpt-4o) でのテキスト生成。キー無し・失敗時はNone。"""
     if not _has_openai_key():
         return None
@@ -515,14 +517,17 @@ def _generate_text_with_openai(system: str, user: str) -> Optional[str]:
         from openai import OpenAI  # type: ignore
 
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-        resp = client.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL", OPENAI_MODEL_DEFAULT),
-            messages=[
+        request = {
+            "model": os.environ.get("OPENAI_MODEL", OPENAI_MODEL_DEFAULT),
+            "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            temperature=0.3,
-        )
+            "temperature": 0.3,
+        }
+        if max_output_tokens is not None:
+            request["max_completion_tokens"] = max_output_tokens
+        resp = client.chat.completions.create(**request)
         text = (resp.choices[0].message.content or "").strip()
         return text or None
     except Exception as e:  # noqa: BLE001
@@ -530,7 +535,9 @@ def _generate_text_with_openai(system: str, user: str) -> Optional[str]:
         return None
 
 
-def _generate_text_with_gemini(system: str, user: str) -> Optional[str]:
+def _generate_text_with_gemini(
+    system: str, user: str, max_output_tokens: Optional[int] = None
+) -> Optional[str]:
     """Gemini でのテキスト生成。キー無し・失敗時はNone（モデル廃止時は次候補へ）。"""
     if not _has_gemini_key():
         return None
@@ -543,7 +550,11 @@ def _generate_text_with_gemini(system: str, user: str) -> Optional[str]:
                 resp = client.models.generate_content(
                     model=model_name,
                     contents=user,
-                    config={"system_instruction": system, "temperature": 0.3},
+                    config={
+                        "system_instruction": system,
+                        "temperature": 0.3,
+                        **({"max_output_tokens": max_output_tokens} if max_output_tokens else {}),
+                    },
                 )
                 text = (getattr(resp, "text", "") or "").strip()
                 if text:
@@ -564,7 +575,10 @@ def _generate_text_with_gemini(system: str, user: str) -> Optional[str]:
             os.environ.get("GEMINI_MODEL", GEMINI_MODEL_DEFAULT),
             system_instruction=system,
         )
-        resp = model.generate_content(user)
+        if max_output_tokens is None:
+            resp = model.generate_content(user)
+        else:
+            resp = model.generate_content(user, generation_config={"max_output_tokens": max_output_tokens})
         text = (getattr(resp, "text", "") or "").strip()
         return text or None
     except Exception as e:  # noqa: BLE001
@@ -572,23 +586,25 @@ def _generate_text_with_gemini(system: str, user: str) -> Optional[str]:
         return None
 
 
-def _generate_text_auto(system: str, user: str) -> Tuple[Optional[str], AIProvider]:
+def _generate_text_auto(
+    system: str, user: str, max_output_tokens: Optional[int] = None
+) -> Tuple[Optional[str], AIProvider]:
     """優先順位に従いテキスト生成を試行し、(本文, 実際に使ったプロバイダ) を返す。
 
     第1候補が失敗した場合は第2候補へ自動フォールバックする。
     """
     provider = get_active_provider()
     if provider == "openai":
-        text = _generate_text_with_openai(system, user)
+        text = _generate_text_with_openai(system, user, max_output_tokens)
         if text:
             return text, "openai"
-        text = _generate_text_with_gemini(system, user)
+        text = _generate_text_with_gemini(system, user, max_output_tokens)
         return (text, "gemini") if text else (None, "openai")
     if provider == "gemini":
-        text = _generate_text_with_gemini(system, user)
+        text = _generate_text_with_gemini(system, user, max_output_tokens)
         if text:
             return text, "gemini"
-        text = _generate_text_with_openai(system, user)
+        text = _generate_text_with_openai(system, user, max_output_tokens)
         return (text, "openai") if text else (None, "gemini")
     return None, "none"
 
@@ -756,23 +772,32 @@ EXPLANATION_SYSTEM = (
 
 LESSON_PLAN_SYSTEM = (
     "あなたは学習指導要領に精通し、研究授業の指導案を何百本も書いてきたベテラン教師です。"
-    "【正確な座標・数値】と【資料解析結果】に厳密に基づき、現場でそのまま使える詳細な"
-    "「単元全体の指導計画＋本時の展開案」をMarkdownで作成してください。"
-    "数値の捏造は固く禁止です。抽象的なangk概論ではなく、具体的な発問・板書・評価場面まで書きます。"
-    "以下の構成をすべて出力してください（分量の目安：1500〜2500字、詳しさ優先）。"
+    "【正確な座標・数値】と【資料解析結果】に基づき、授業準備にそのまま使える"
+    "「単元全体の評価計画と、全ての時間の詳細な授業展開案」をMarkdownで作成してください。"
+    "与えられていない数値や教材事実は捏造せず、教材に依存しない項目は妥当な案として明示してください。"
+    "短い概論や概要だけで済ませず、各時の学習活動・教師の具体的な発問・予想される反応・支援・評価まで書きます。"
+    "全体で日本語3000〜5000字を目安に、詳しさを優先してください。"
     "出力は '# 単元指導計画' から始めてください。"
     "\n\n# 必ず含める構成\n"
-    "## 1. 単元名・対象学年・全時間数\n"
-    "## 2. 単元の目標（3観点別に具体的記述：知識・技能／思考・判断・表現／主体的に学習に取り組む態度）\n"
-    "## 3. 単元の評価規準（3観点ごとに「おおむね満足できる状況(B)」と「十分満足できる状況(A)」の具体例）\n"
-    "## 4. 単元の指導計画（全時間の表：時｜ねらい｜主な学習活動｜評価の観点と方法）\n"
-    "## 5. 本時案\n"
-    "### 本時の目標\n"
-    "### 展開（表形式：過程（導入・展開1・展開2・まとめ）｜時間｜児童・生徒の活動｜教師の支援・発問例｜評価場面）\n"
-    "### 板書計画（左・中・右の配置と書く内容の具体例）\n"
-    "### 使用する図形と数値の読み方（本教材の計測値をどこでどう使うか）\n"
-    "## 6. 資料活用のポイント（添付資料がある場合、その写真・PDFのどこをどう見せるか）"
+    "## 1. 単元名・対象学年・単元観・全時間数\n"
+    "## 2. 単元の目標（知識・技能／思考・判断・表現／主体的に学習に取り組む態度を観察可能な表現で）\n"
+    "## 3. 単元の評価規準（3観点ごとにB「おおむね満足」とA「十分満足」の具体的な児童生徒の姿）\n"
+    "## 4. 単元の指導・評価計画\n"
+    "全時間を1時ずつ省略せずに表にしてください（時｜ねらい・中心課題｜主な活動と考えのつながり｜評価する観点・評価規準｜評価方法・記録する証拠）。"
+    "単元の時数は内容に応じて4〜6時間程度とし、各時間に異なる役割と学びの進展を持たせてください。"
+    "評価は単元末にまとめず、どの時に何を見取り、記録に残す評価か、形成的に支援する評価かを明記してください。"
+    "## 5. 各時間の詳細な授業展開（第1時から最終時まで、全ての時間を同じ詳しさで個別に記述）\n"
+    "各時に「本時の目標」「中心発問・課題」を書き、45分の展開表を作ってください。"
+    "表の列は「過程・時間（合計45分）｜児童生徒の具体的な活動・予想される反応｜教師の発問・支援・板書｜評価（観点・見取る姿・方法）」とします。"
+    "導入・課題把握、個人/協働探究、考えの比較・共有、まとめ・振り返りを各時の目的に合わせて具体化してください。"
+    "各時で少なくとも2つの具体的な発問、つまずきへの手立て、次時につなぐ振り返りを入れてください。"
+    "## 6. 単元全体の評価の進め方と支援\n"
+    "3観点それぞれについて、評価時・具体的な証拠・記録方法・Bに届かない場合の支援・Aに達した場合の発展を示してください。\n"
+    "## 7. 板書・教材活用\n"
+    "本教材の図形・計測値をどの時間のどの場面で使うか、板書の配置とともに具体化してください。添付資料がある場合は、その資料を提示する時間・箇所・問いも記載してください。"
 )
+
+LESSON_PLAN_MAX_OUTPUT_TOKENS = 8192
 
 WORKSHEET_SYSTEM = (
     "あなたは算数・数学の問題作成の専門家です。"
@@ -888,20 +913,55 @@ def _template_explanation(prompt: str, grade: str, mode: str, geom: Dict[str, An
 
 def _template_lesson_plan(prompt: str, grade: str, geom: Dict[str, Any]) -> str:
     summary = (geom.get("measurements", {}) or {}).get("summary", "")
+    sessions = [
+        ("図形の構成要素と見通し", "図形を観察し、既習事項や構成要素を整理する", "どこに注目すると、この図形の特徴を説明できそうですか？", "頂点・辺・角を指し示し、気づきを図に書き込む", "図形の用語や長さを正しく読み取っているかを発言・記録で確認"),
+        ("条件を変えた観察", "頂点や辺を動かし、変わる量と保たれる関係を比較する", "点を動かしても変わらない関係はありますか。どの数値が根拠ですか？", "操作前後の図と計測値を並べ、予想と結果を記録する", "操作結果を数値と結び付けて説明しているかを机間指導で見取る"),
+        ("性質の説明と検証", "図や測定値を根拠に性質を説明し、別の例でも確かめる", "その説明は別の形でも成り立つでしょうか。どこを確かめますか？", "個人の説明をペアで比較し、例外がないか追加検証する", "根拠と結論を区別して説明しているかをノートで評価する"),
+        ("考えの比較と一般化", "複数の考えを比べ、共通する性質や条件を整理する", "二つの考えに共通する根拠は何ですか。条件を変えるとどうなりますか？", "説明を図・式・言葉で整理し、全体交流で修正する", "筋道を立てた説明と他者の考えを取り入れる姿を発言で確認"),
+        ("活用・まとめ", "学んだ性質を新しい課題に使い、学習を振り返る", "今日の性質を使うと、初めて見る図形の何が分かりますか？", "新しい図形を分析し、結論と根拠を短いレポートにまとめる", "性質を適用し、根拠を示して説明できるかを成果物で評価"),
+    ]
+    sections = []
+    plan_rows = []
+    for index, (focus, aim, question, activity, assessment) in enumerate(sessions, start=1):
+        plan_rows.append(
+            f"| 第{index}時 | {aim} | {activity} | 思考・判断・表現：{assessment} |"
+        )
+        sections.append(
+            f"### 第{index}時：{focus}\n"
+            f"**本時の目標：** {aim}。\n\n"
+            f"| 過程・時間 | 児童生徒の活動・予想される反応 | 教師の発問・支援・板書 | 評価（観点・方法） |\n"
+            f"|---|---|---|---|\n"
+            f"| 導入・課題把握 5分 | 前時の記録や提示図形を見直し、本時の問いを自分の言葉で捉える。 | 「{question}」と問い、既習の用語を板書の左側に整理する。 | 主体的態度：課題への予想を発言・ノートで確認 |\n"
+            f"| 個人探究 15分 | {activity}。予想と異なる結果があれば、その理由を図に記す。 | 操作が難しい場合は注目する点を一つに絞るよう促し、「何を根拠にそう考えましたか」と問う。 | 知識・技能：図形や計測値の読み取りを観察・ノートで確認 |\n"
+            f"| 対話・検証 15分 | ペアで結果を比べ、共通点・相違点を説明する。別の例でも確かめる。 | 「別の形でも成り立つ？」「図・数値のどちらが根拠？」と問い、考えを板書中央に並べる。 | 思考・判断・表現：根拠と結論のつながりを発言・記述で見取る |\n"
+            f"| 共有・まとめ 10分 | 全体で性質を整理し、振り返りに次に確かめたいことを書く。 | 重要語句と本時の結論を板書右側にまとめ、次時の課題につなぐ。 | 主体的態度：振り返りの具体性を記録 |\n"
+        )
+    plan = "\n".join(plan_rows)
+    all_lessons = "\n".join(sections)
     return (
-        f"# 学習指導案（{grade}）\n\n## 1. 単元・題材\n{prompt}（{geom.get('title', '')}）\n\n"
-        f"## 2. 正確な教材数値\n{summary}\n\n"
-        "## 3. 目標（3観点）\n"
-        "- 知識・技能：図形の構成要素（頂点・辺・内接円）を正確に読み取れる。\n"
-        "- 思考・判断・表現：頂点を動かしたときの変化を根拠とともに説明できる。\n"
-        "- 主体的に学習に取り組む態度：計測値を手がかりに自ら問いを立て、探求できる。\n\n"
-        "## 4. 展開（45分）\n"
-        "| 時間 | 活動 | 教師の支援 |\n|---|---|---|\n"
-        "| 5分 | 導入・課題把握 | 電子黒板に図形を投影し、本時の問いを共有する |\n"
-        "| 25分 | 個人探求・ペア対話 | 頂点ドラッグで変化を観察させ、根拠を言語化させる |\n"
-        "| 10分 | 全体共有 | 代表の気づきを板書し、定義・性質に練り上げる |\n"
-        "| 5分 | まとめ・振り返り | ワークシートで自己評価する |\n\n"
-        "## 5. 評価規準\n- 図形の性質を計測値と結びつけて説明している（思考・判断・表現）。"
+        f"# 単元指導計画（{grade}）\n\n"
+        f"## 1. 単元・題材\n{prompt}（{geom.get('title', '図形')}）\n\n"
+        "## 2. 単元の目標\n"
+        "- 知識・技能：図形の構成要素や計測値を正しく読み取り、性質を用いて課題を解決する。\n"
+        "- 思考・判断・表現：図・数値・式を根拠に予想を検証し、性質が成り立つ理由を筋道立てて説明する。\n"
+        "- 主体的に学習に取り組む態度：自ら問いを立て、他者の考えや検証結果を取り入れて学びを深める。\n\n"
+        "## 3. 単元の評価規準\n"
+        "| 観点 | B：おおむね満足 | A：十分満足 |\n|---|---|---|\n"
+        "| 知識・技能 | 図形の要素・計測値を読み取り、学習した性質を使える。 | 条件を正確に整理し、性質を複数の場面で適切に使える。 |\n"
+        "| 思考・判断・表現 | 図や数値を根拠として、自分の考えを説明できる。 | 複数の根拠を関連付け、別の方法や一般性にも触れて説明できる。 |\n"
+        "| 主体的態度 | 見通しをもち、振り返りを次の探究に生かそうとしている。 | 他者の考えを取り入れて問いや検証方法を自ら発展させている。 |\n\n"
+        "## 4. 単元の指導・評価計画（全5時間）\n"
+        "| 時 | ねらい | 主な活動 | 評価の観点・方法 |\n|---|---|---|---|\n"
+        f"{plan}\n\n"
+        "## 5. 各時間の詳細な授業展開（各45分）\n"
+        f"{all_lessons}"
+        "## 6. 単元全体の評価と支援\n"
+        "- 知識・技能：第1・2時の操作・ノートと第5時の課題で見取る。読み取りが不確かな場合は、頂点・辺を色分けした図と計測表示を対応させる。発展として複数条件を組み合わせた課題に取り組ませる。\n"
+        "- 思考・判断・表現：第2〜5時の説明、ノート、最終レポートを証拠として記録する。根拠が不足する場合は「どの図・数値から言えるか」を問い返し、十分に説明できる場合は別の図形でも成り立つか検証させる。\n"
+        "- 主体的態度：各時の予想・振り返りと対話への参加を継続的に見取る。問いが立てにくい場合は観察の視点を提示し、探究を発展できる場合は自分で条件を設定させる。\n\n"
+        "## 7. 板書・教材活用\n"
+        f"- 図形と計測値：{summary or '表示された図形の辺・角・面積など'}を第1時の既習確認、第2・3時の比較検証、第5時の活用問題で用いる。数値は表示された測定値を読み取り、与えられていない値は断定しない。\n"
+        "- 板書は左に課題・予想、中央に図・操作結果・根拠、右に一般化した性質・振り返りを配置する。"
     )
 
 
@@ -1004,7 +1064,9 @@ def generate_educational_content(
     if explanation and headline and headline.strip() not in explanation:
         explanation = headline + explanation
     if mode == "teacher":
-        lesson_plan, used_lp = _generate_text_auto(LESSON_PLAN_SYSTEM, lp_user)
+        lesson_plan, used_lp = _generate_text_auto(
+            LESSON_PLAN_SYSTEM, lp_user, max_output_tokens=LESSON_PLAN_MAX_OUTPUT_TOKENS
+        )
         used = used_lp or used
         ai_ws = _generate_worksheet_ai(numbers)
         if ai_ws:
