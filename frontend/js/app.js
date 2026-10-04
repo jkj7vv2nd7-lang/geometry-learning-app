@@ -913,6 +913,7 @@
     }
     applyPanel(!!pref.panelCollapsed);
     if (panelBtn) panelBtn.addEventListener('click', function () {
+      if (currentMode !== 'teacher') return;
       var collapsed = !layout.classList.contains('panel-collapsed');
       applyPanel(collapsed);
       saveLayout({ panelCollapsed: collapsed });
