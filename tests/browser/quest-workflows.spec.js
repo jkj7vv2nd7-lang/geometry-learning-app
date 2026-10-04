@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
     }
     return route.continue();
   });
-  await page.route('**/js/solid.js', (route) =>
+  await page.route('**/js/solid.js*', (route) =>
     route.fulfill({ contentType: 'application/javascript', body: 'export {};'}));
 });
 
@@ -64,6 +64,7 @@ test('local CSS, math rendering, and vendor assets work without external network
 
 test('submission reports export one selected record with only explicitly selected personal content', async ({ page }) => {
   await page.goto('/');
+  await page.locator('#student-tab-journal').click();
   await page.evaluate(() => localStorage.setItem('journal-v1', JSON.stringify([{
     time: '2026/10/04 10:00',
     createdAt: '2026-10-04T01:00:00.000Z',
@@ -76,6 +77,7 @@ test('submission reports export one selected record with only explicitly selecte
     construction: { points: { A: { x: 20, y: 40 } }, segments: [['A', 'B']] }
   }])));
   await page.reload();
+  await page.locator('#student-tab-journal').click();
   await page.locator('#journal-export-report-btn').click();
   await expect(page.locator('#journal-report-dialog')).toBeVisible();
   await expect(page.locator('#journal-report-name')).toBeDisabled();
@@ -107,6 +109,7 @@ test('submission reports export one selected record with only explicitly selecte
 
 test('filters quests by stage, grade, and unit', async ({ page }) => {
   await page.goto('/');
+  await page.locator('#student-tab-quests').click();
   await expect(page.locator('#quest-list .quest-card')).toHaveCount(30);
   await page.getByRole('button', { name: '中学校', exact: true }).click();
   await page.locator('#quest-grade-filter').selectOption('中学校3年');
@@ -129,6 +132,7 @@ test('teacher task packs can be imported by learners and cleared locally', async
   expect(pack.questIds).toHaveLength(1);
 
   await page.locator('#mode-student-btn').click();
+  await page.locator('#student-tab-quests').click();
   await page.locator('#student-task-pack-input').setInputFiles({
     name: 'lesson-pack.json',
     mimeType: 'application/json',
@@ -188,10 +192,12 @@ test('service worker caches the app shell for offline inquiry and construction',
   }));
   expect(pwaResources.manifest).toBe(200);
   expect(pwaResources.worker).toBe(200);
-  expect(pwaResources.cacheKeys).toContain('geometry-learning-shell-v1');
+  expect(pwaResources.cacheKeys).toContain('geometry-learning-shell-v2');
 
+  await page.locator('#student-tab-quests').click();
   await context.setOffline(true);
   await page.reload();
+  await page.locator('#student-tab-quests').click();
   await expect(page.locator('#quest-list .quest-card')).toHaveCount(30);
   await expect(page.locator('#connection-status')).toContainText('オフラインです');
   await page.locator('#geometry-canvas').focus();
@@ -269,6 +275,7 @@ test('tablet and phone layouts keep inquiry and drawing controls within the view
   for (const viewport of [{ width: 768, height: 1024 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
+    await page.locator('#student-tab-quests').click();
     await page.getByRole('button', { name: '中学校', exact: true }).click();
     await page.locator('#quest-grade-filter').selectOption('中学校1年');
     await page.locator('#quest-list .quest-card').first().focus();
@@ -293,6 +300,7 @@ test('tablet and phone layouts keep inquiry and drawing controls within the view
 test('guided, counterexample, blank, and saved-draft quest paths work', async ({ page }) => {
   page.on('dialog', (dialog) => dialog.accept());
   await page.goto('/');
+  await page.locator('#student-tab-quests').click();
   await page.getByRole('button', { name: '中学校', exact: true }).click();
   await page.locator('#quest-grade-filter').selectOption('中学校1年');
   await page.locator('#quest-unit-filter').selectOption('平面図形と作図');
@@ -373,6 +381,7 @@ test('teacher lesson sets save and export learner worksheets', async ({ page }) 
 test('journal import and anonymous portfolio export omit free-text learner data', async ({ page }) => {
   page.on('dialog', (dialog) => dialog.accept());
   await page.goto('/');
+  await page.locator('#student-tab-journal').click();
   await page.locator('#journal-import-input').setInputFiles({
     name: 'journal.json',
     mimeType: 'application/json',

@@ -7,9 +7,9 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <title>インタラクティブ図形学習支援ツール</title>
   <!-- Tailwind CSS (ローカルビルド。実行時のCDN通信は不要) -->
-  <link rel="stylesheet" href="css/tailwind.generated.css" />
+  <link rel="stylesheet" href="css/tailwind.generated.css?v=20261005" />
   <!-- 独自スタイル -->
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/style.css?v=20261005" />
   <!-- KaTeX（数式の教科書体表示・ローカル配信） -->
   <link rel="stylesheet" href="vendor/katex/katex.min.css" />
 </head>
@@ -28,7 +28,7 @@
 
     <!-- モード切替：児童・生徒 / 教師 -->
     <nav id="mode-switcher" aria-label="モード切替" class="flex items-center gap-2 bg-white/70 p-1 rounded-full">
-      <button id="toggle-panel-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="左の入力パネルを表示／隠す">📋 入力欄</button>
+      <button id="toggle-panel-btn" type="button" hidden aria-hidden="true" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="左の入力パネルを表示／隠す">📋 入力欄</button>
       <button id="header-solid-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="立体図形（3D）の表示／非表示" aria-pressed="false">🧊 立体</button>
       <button id="float-panels-btn" type="button" class="mode-tab-btn px-4 py-2 rounded-full font-bold text-sm min-h-[44px] transition" title="解説・履歴・記録帳をフローティング表示／元の位置に戻す" aria-pressed="false">🪟 フロート</button>
       <div id="mode-tabs" role="tablist" aria-label="利用モード" class="flex items-center gap-1">
@@ -560,14 +560,14 @@
 
   <!-- アプリロジック（描画エンジン → 制御の順で読込） -->
   <script defer src="vendor/katex/katex.min.js"></script>
-  <script src="js/renderer.js" defer></script>
-  <script src="js/quests.js" defer></script>
-  <script src="js/quest-validation.js" defer></script>
-  <script src="js/app.js" defer></script>
+  <script src="js/renderer.js?v=20261005" defer></script>
+  <script src="js/quests.js?v=20261005" defer></script>
+  <script src="js/quest-validation.js?v=20261005" defer></script>
+  <script src="js/app.js?v=20261005" defer></script>
   <!-- 3D立体ビュー（three.jsモジュール） -->
   <script type="importmap">
     { "imports": { "three": "vendor/three.module.min.js" } }
   </script>
-  <script type="module" src="js/solid.js"></script>
+  <script type="module" src="js/solid.js?v=20261005"></script>
 </body>
 </html>

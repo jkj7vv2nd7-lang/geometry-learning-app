@@ -66,7 +66,15 @@
     window.addEventListener('offline', update);
     update();
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-      navigator.serviceWorker.register('/service-worker.js').catch(function (error) {
+      if (navigator.serviceWorker.controller) {
+        var reloadedForWorkerUpdate = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (reloadedForWorkerUpdate) return;
+          reloadedForWorkerUpdate = true;
+          window.location.reload();
+        });
+      }
+      navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }).catch(function (error) {
         console.warn('オフライン用ページの登録に失敗しました:', error);
       });
     }
@@ -157,6 +165,11 @@
     document.body.setAttribute('data-mode', currentMode);
     document.body.classList.toggle('student-mode', currentMode === 'student');
     document.body.classList.toggle('teacher-mode', currentMode === 'teacher');
+    var panelToggle = $('toggle-panel-btn');
+    if (panelToggle) {
+      panelToggle.hidden = currentMode !== 'teacher';
+      panelToggle.setAttribute('aria-hidden', String(currentMode !== 'teacher'));
+    }
 
     // トグルボタンの見た目・aria
     var sb = $('mode-student-btn'), tb = $('mode-teacher-btn');

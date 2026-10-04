@@ -1,17 +1,17 @@
 'use strict';
 
-const CACHE_NAME = 'geometry-learning-shell-v1';
+const CACHE_NAME = 'geometry-learning-shell-v2';
 const SHELL_ASSETS = [
   '/',
   '/manifest.webmanifest',
   '/icon.svg',
-  '/css/style.css',
-  '/css/tailwind.generated.css',
-  '/js/solid.js',
-  '/js/renderer.js',
-  '/js/quests.js',
-  '/js/quest-validation.js',
-  '/js/app.js',
+  '/css/style.css?v=20261005',
+  '/css/tailwind.generated.css?v=20261005',
+  '/js/solid.js?v=20261005',
+  '/js/renderer.js?v=20261005',
+  '/js/quests.js?v=20261005',
+  '/js/quest-validation.js?v=20261005',
+  '/js/app.js?v=20261005',
   '/vendor/katex/katex.min.css',
   '/vendor/katex/katex.min.js',
   '/vendor/three.module.min.js'

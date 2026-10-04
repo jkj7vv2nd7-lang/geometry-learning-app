@@ -246,7 +246,8 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
   assert.match(html, /id="journal-export-status"[^>]*role="status"/);
   assert.match(html, /id="journal-report-name"[^>]*disabled/);
   assert.match(html, /manifest\.webmanifest/);
-  assert.ok(fs.readFileSync(path.join(root, 'frontend/js/app.js'), 'utf8').includes("register('/service-worker.js')"));
+  assert.match(fs.readFileSync(path.join(root, 'frontend/js/app.js'), 'utf8'),
+    /register\('\/service-worker\.js',\s*\{\s*updateViaCache:\s*'none'\s*\}\)/);
   assert.doesNotMatch(html, /cdn\.tailwindcss\.com|cdn\.jsdelivr\.net|unpkg\.com/);
   assert.match(html, /vendor\/katex\/katex\.min\.css/);
   assert.match(html, /vendor\/three\.module\.min\.js/);
@@ -259,4 +260,24 @@ test('HTML exposes keyboard-operable filters, reflection, teacher worksheet, and
   assert.match(app, /氏名・予想・振り返り・自由記述は含みません/);
   assert.match(app, /construction: window\.ConstructionBoard \? window\.ConstructionBoard\.serialize\(\{ traces: true \}\)/);
   assert.match(app, /function scheduleQuestDraftSave/);
+});
+
+test('student mode hides the input panel toggle and cache-busts changed UI assets', () => {
+  const html = fs.readFileSync(path.join(root, 'frontend/index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(root, 'frontend/css/style.css'), 'utf8');
+  const tailwind = fs.readFileSync(path.join(root, 'frontend/css/tailwind.generated.css'), 'utf8');
+  const app = fs.readFileSync(path.join(root, 'frontend/js/app.js'), 'utf8');
+  const worker = fs.readFileSync(path.join(root, 'frontend/service-worker.js'), 'utf8');
+
+  assert.match(html, /<body data-mode="student"/);
+  assert.ok(tailwind.includes(String.raw`.lg\:grid-cols-\[320px_minmax\(0\,1fr\)\]`),
+    'the generated desktop grid must include the class used by the app layout');
+  assert.match(html, /<button id="toggle-panel-btn"[^>]*\shidden\b/);
+  assert.match(html, /href="css\/style\.css\?v=\d+"/);
+  assert.match(html, /src="js\/app\.js\?v=\d+"/);
+  assert.match(css, /body\[data-mode="student"\] #control-panel,[\s\S]*?body\[data-mode="student"\] #toggle-panel-btn\s*\{\s*display:\s*none !important;/);
+  assert.match(app, /panelToggle\.hidden = currentMode !== 'teacher'/);
+  assert.match(worker, /geometry-learning-shell-v2/);
+  assert.match(app, /updateViaCache:\s*'none'/);
+  assert.match(app, /window\.location\.reload\(\)/);
 });
