@@ -238,6 +238,43 @@
     });
   }
 
+  function selectStudentToolTab(key, focusTab) {
+    var tabs = document.querySelectorAll('[data-student-tool]');
+    var panels = document.querySelectorAll('[data-student-tool-panel]');
+    var selected = null;
+    tabs.forEach(function (tab) {
+      var active = tab.getAttribute('data-student-tool') === key;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active) selected = tab;
+    });
+    panels.forEach(function (panel) {
+      panel.classList.toggle('hidden', panel.getAttribute('data-student-tool-panel') !== key);
+    });
+    if (selected && focusTab) selected.focus();
+  }
+
+  function initStudentToolTabs() {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('[data-student-tool]'));
+    if (!tabs.length) return;
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener('click', function () {
+        selectStudentToolTab(tab.getAttribute('data-student-tool'));
+      });
+      tab.addEventListener('keydown', function (e) {
+        var next = index;
+        if (e.key === 'ArrowRight') next = (index + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = tabs.length - 1;
+        else return;
+        e.preventDefault();
+        selectStudentToolTab(tabs[next].getAttribute('data-student-tool'), true);
+      });
+    });
+    selectStudentToolTab('chat');
+  }
+
   // ============================================================
   // アップロードゾーン / URLリスト
   // ============================================================ */
@@ -1438,7 +1475,10 @@
       saveLayout({ solidOpen: open });
     }
     if (solidToggle) solidToggle.addEventListener('click', function () { toggleSolidFromUI(false); });
-    if (headerSolidBtn) headerSolidBtn.addEventListener('click', function () { toggleSolidFromUI(true); });
+    if (headerSolidBtn) headerSolidBtn.addEventListener('click', function () {
+      if (currentMode === 'student') selectStudentToolTab('solid');
+      toggleSolidFromUI(true);
+    });
 
     // チャット・記録帳の開閉（ツールバー感覚で見え隠れ）
     function wireCollapsible(toggleId, bodyId, prefKey, openLabel, closeLabel) {
@@ -2527,6 +2567,7 @@
     }
     initModeSwitch();
     initTeacherTabs();
+    initStudentToolTabs();
     initUploadZone();
     initJsonButtons();
     initConstructionBoard();
